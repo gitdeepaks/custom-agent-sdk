@@ -48,7 +48,11 @@ export interface ToolMessage {
   readonly output: unknown;
 }
 
-export type ModelMessage = SystemMessage | UserMessage | AssistantMessage | ToolMessage;
+export type ModelMessage =
+  | SystemMessage
+  | UserMessage
+  | AssistantMessage
+  | ToolMessage;
 
 export interface ModelTool {
   readonly name: string;

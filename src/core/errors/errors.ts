@@ -31,7 +31,10 @@ export class ToolError extends AgentSdkError {
   readonly toolCallId: string;
 
   constructor(options: {
-    readonly code: "TOOL_NOT_FOUND" | "TOOL_INPUT_INVALID" | "TOOL_EXECUTION_FAILED";
+    readonly code:
+      | "TOOL_NOT_FOUND"
+      | "TOOL_INPUT_INVALID"
+      | "TOOL_EXECUTION_FAILED";
     readonly message: string;
     readonly toolName: string;
     readonly toolCallId: string;

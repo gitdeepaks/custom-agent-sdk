@@ -17,6 +17,33 @@ This repository is the production-oriented core foundation. It includes text gen
 bun install
 ```
 
+## Environment Variables
+
+Create a local environment file from the committed template:
+
+```bash
+cp .env.example .env
+```
+
+Bun automatically loads `.env`; no `dotenv` dependency is required. Set only the credentials needed by the provider adapter used by your application:
+
+```env
+# Used by an OpenAI adapter
+OPENAI_API_KEY=sk-...
+
+# Used by an Anthropic adapter
+ANTHROPIC_API_KEY=sk-ant-...
+```
+
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `OPENAI_API_KEY` | For OpenAI only | Authenticates requests made by an OpenAI provider adapter. |
+| `ANTHROPIC_API_KEY` | For Anthropic only | Authenticates requests made by an Anthropic provider adapter. |
+| `OPENAI_BASE_URL` | No | Overrides the OpenAI endpoint when supported by the adapter. |
+| `ANTHROPIC_BASE_URL` | No | Overrides the Anthropic endpoint when supported by the adapter. |
+
+The core `@open-agent/sdk` package does not read these variables. Credentials belong to the application or provider package that constructs the `LanguageModel`. Do not use `OPENAI_API_KEY || ANTHROPIC_API_KEY`; select a provider explicitly and validate its corresponding key. Never commit `.env` or real credentials. The repository ignores `.env` while retaining `.env.example` as documentation.
+
 ## Quick Start
 
 Providers implement the small `LanguageModel` interface:
@@ -104,6 +131,29 @@ bun run build
 ## Provider Contract
 
 Implement `LanguageModel.generate` and optionally `LanguageModel.stream`. The core owns orchestration; adapters own authentication, wire-format validation, provider error normalization, and SSE decoding. Keeping that boundary narrow prevents vendor types and credentials from leaking into agents.
+
+Provider packages implement `Provider` and create models through `languageModel(modelId)`. Each provider owns its API key, endpoint, request validation, and environment-variable policy. The core intentionally never reads `OPENAI_API_KEY` or `ANTHROPIC_API_KEY`.
+
+## Project Structure
+
+```text
+src/
+├── index.ts                    # Stable public package entry point
+└── core/
+    ├── index.ts                # Core export boundary
+    ├── agent/agent.ts          # Reusable Agent facade
+    ├── errors/errors.ts        # Stable SDK and tool errors
+    ├── generation/
+    │   ├── generate-text.ts    # Generation and tool loop
+    │   └── stream-text.ts      # Provider-native streaming
+    ├── model/types.ts          # Provider protocol and messages
+    ├── provider/provider.ts    # Provider factory contract
+    └── tools/tool.ts           # Schemas and typed tools
+test/
+└── sdk.test.ts                 # Public behavior tests
+```
+
+Future OpenAI and Anthropic adapters should be separate packages, such as `@open-agent/openai` and `@open-agent/anthropic`, rather than importing credentials into `@open-agent/sdk`.
 
 ## License
 

@@ -1,7 +1,12 @@
-import { generateText, type GenerateTextOptions, type GenerateTextResult, type Prompt } from "./generate-text";
-import { streamText, type StreamTextResult } from "./stream-text";
-import type { ToolSet } from "./tool";
-import type { LanguageModel } from "./types";
+import {
+  generateText,
+  type GenerateTextOptions,
+  type GenerateTextResult,
+  type Prompt,
+} from "../generation/generate-text";
+import { streamText, type StreamTextResult } from "../generation/stream-text";
+import type { ToolSet } from "../tools/tool";
+import type { LanguageModel } from "../model/types";
 
 export interface AgentSettings<Tools extends ToolSet> {
   readonly model: LanguageModel;
@@ -33,7 +38,9 @@ export class Agent<Tools extends ToolSet = ToolSet> {
     return streamText(this.toGenerateOptions(options));
   }
 
-  private toGenerateOptions(options: AgentRunOptions): GenerateTextOptions<Tools> {
+  private toGenerateOptions(
+    options: AgentRunOptions,
+  ): GenerateTextOptions<Tools> {
     const shared = {
       model: this.settings.model,
       system: this.settings.instructions,

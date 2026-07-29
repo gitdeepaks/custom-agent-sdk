@@ -1,5 +1,5 @@
-import { AgentSdkError } from "./errors";
-import type { JsonValue, ModelTool } from "./types";
+import { AgentSdkError } from "../errors/errors";
+import type { JsonValue, ModelTool } from "../model/types";
 
 export interface Schema<T> {
   readonly jsonSchema: JsonValue;
@@ -32,19 +32,20 @@ export interface AnyTool {
 
 export type ToolSet = Readonly<Record<string, AnyTool>>;
 
-export type InferToolInput<ToolType> = ToolType extends Tool<string, infer Input, unknown>
-  ? Input
-  : never;
+export type InferToolInput<ToolType> =
+  ToolType extends Tool<string, infer Input, unknown> ? Input : never;
 
-export type InferToolOutput<ToolType> = ToolType extends Tool<string, unknown, infer Output>
-  ? Output
-  : never;
+export type InferToolOutput<ToolType> =
+  ToolType extends Tool<string, unknown, infer Output> ? Output : never;
 
 export const tool = <const Name extends string, Input, Output>(options: {
   readonly name: Name;
   readonly description: string;
   readonly inputSchema: Schema<Input>;
-  readonly execute: (input: Input, context: ToolExecutionContext) => Output | Promise<Output>;
+  readonly execute: (
+    input: Input,
+    context: ToolExecutionContext,
+  ) => Output | Promise<Output>;
 }): Tool<Name, Input, Output> => ({
   name: options.name,
   description: options.description,
@@ -64,7 +65,9 @@ export const tool = <const Name extends string, Input, Output>(options: {
   },
 });
 
-export const toModelTools = (tools: ToolSet | undefined): readonly ModelTool[] =>
+export const toModelTools = (
+  tools: ToolSet | undefined,
+): readonly ModelTool[] =>
   tools
     ? Object.entries(tools).map(([name, definition]) => ({
         name,

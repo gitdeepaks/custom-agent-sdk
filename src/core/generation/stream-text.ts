@@ -1,4 +1,4 @@
-import { AgentSdkError, getErrorMessage } from "./errors";
+import { AgentSdkError, getErrorMessage } from "../errors/errors";
 import {
   createMessages,
   executeTool,
@@ -7,8 +7,14 @@ import {
   type GenerateTextResult,
   type StepResult,
 } from "./generate-text";
-import { toModelTools, type ToolSet } from "./tool";
-import { addUsage, zeroUsage, type ModelMessage, type ModelStreamPart, type ToolCall } from "./types";
+import { toModelTools, type ToolSet } from "../tools/tool";
+import {
+  addUsage,
+  zeroUsage,
+  type ModelMessage,
+  type ModelStreamPart,
+  type ToolCall,
+} from "../model/types";
 
 export type StreamPart =
   | ModelStreamPart
@@ -30,10 +36,19 @@ const streamWithProvider = async <Tools extends ToolSet>(
     return generateText({
       ...options,
       onStepFinish: async (step) => {
-        if (step.text.length > 0) controller.enqueue({ type: "text-delta", text: step.text });
-        for (const toolCall of step.toolCalls) controller.enqueue({ type: "tool-call", toolCall });
-        controller.enqueue({ type: "finish", finishReason: step.finishReason, usage: step.usage });
-        controller.enqueue({ type: "step-finish", step: step.toolResults.length });
+        if (step.text.length > 0)
+          controller.enqueue({ type: "text-delta", text: step.text });
+        for (const toolCall of step.toolCalls)
+          controller.enqueue({ type: "tool-call", toolCall });
+        controller.enqueue({
+          type: "finish",
+          finishReason: step.finishReason,
+          usage: step.usage,
+        });
+        controller.enqueue({
+          type: "step-finish",
+          step: step.toolResults.length,
+        });
         await options.onStepFinish?.(step);
       },
     });
@@ -47,7 +62,11 @@ const streamWithProvider = async <Tools extends ToolSet>(
 
   for (let index = 0; index < maxSteps; index += 1) {
     if (options.abortSignal?.aborted) {
-      throw new AgentSdkError({ code: "ABORTED", message: "Generation was aborted", cause: options.abortSignal.reason });
+      throw new AgentSdkError({
+        code: "ABORTED",
+        message: "Generation was aborted",
+        cause: options.abortSignal.reason,
+      });
     }
 
     const modelStream = await stream({
@@ -61,7 +80,9 @@ const streamWithProvider = async <Tools extends ToolSet>(
     const reader = modelStream.getReader();
     const toolCalls: ToolCall[] = [];
     let text = "";
-    let finish: Extract<ModelStreamPart, { readonly type: "finish" }> | undefined;
+    let finish:
+      | Extract<ModelStreamPart, { readonly type: "finish" }>
+      | undefined;
 
     while (true) {
       const read = await reader.read();
@@ -74,7 +95,10 @@ const streamWithProvider = async <Tools extends ToolSet>(
     }
 
     if (!finish) {
-      throw new AgentSdkError({ code: "MODEL_ERROR", message: "Model stream ended without a finish event" });
+      throw new AgentSdkError({
+        code: "MODEL_ERROR",
+        message: "Model stream ended without a finish event",
+      });
     }
 
     const assistantMessage: ModelMessage = {
@@ -86,7 +110,9 @@ const streamWithProvider = async <Tools extends ToolSet>(
     responseMessages.push(assistantMessage);
 
     const toolResults = await Promise.all(
-      toolCalls.map((call) => executeTool(call, options.tools?.[call.toolName], options.abortSignal)),
+      toolCalls.map((call) =>
+        executeTool(call, options.tools?.[call.toolName], options.abortSignal),
+      ),
     );
     messages.push(...toolResults);
     responseMessages.push(...toolResults);
@@ -138,9 +164,14 @@ export const streamText = <Tools extends ToolSet = ToolSet>(
           controller.close();
         },
         (error) => {
-          const sdkError = error instanceof AgentSdkError
-            ? error
-            : new AgentSdkError({ code: "MODEL_ERROR", message: getErrorMessage(error), cause: error });
+          const sdkError =
+            error instanceof AgentSdkError
+              ? error
+              : new AgentSdkError({
+                  code: "MODEL_ERROR",
+                  message: getErrorMessage(error),
+                  cause: error,
+                });
           controller.enqueue({ type: "error", error: sdkError });
           rejectResult(sdkError);
           controller.close();
@@ -150,11 +181,13 @@ export const streamText = <Tools extends ToolSet = ToolSet>(
   });
 
   const [fullStream, textSource] = source.tee();
-  const textStream = textSource.pipeThrough(new TransformStream<StreamPart, string>({
-    transform(part, controller) {
-      if (part.type === "text-delta") controller.enqueue(part.text);
-    },
-  }));
+  const textStream = textSource.pipeThrough(
+    new TransformStream<StreamPart, string>({
+      transform(part, controller) {
+        if (part.type === "text-delta") controller.enqueue(part.text);
+      },
+    }),
+  );
 
   return { fullStream, textStream, result };
 };

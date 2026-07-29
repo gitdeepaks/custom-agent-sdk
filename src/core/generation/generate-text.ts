@@ -1,5 +1,5 @@
-import { AgentSdkError, ToolError, getErrorMessage } from "./errors";
-import { toModelTools, type AnyTool, type ToolSet } from "./tool";
+import { AgentSdkError, ToolError, getErrorMessage } from "../errors/errors";
+import { toModelTools, type AnyTool, type ToolSet } from "../tools/tool";
 import {
   addUsage,
   zeroUsage,
@@ -9,7 +9,7 @@ import {
   type ModelResponse,
   type ToolCall,
   type Usage,
-} from "./types";
+} from "../model/types";
 
 export type Prompt =
   | { readonly prompt: string; readonly messages?: never }
@@ -41,13 +41,19 @@ export type GenerateTextOptions<Tools extends ToolSet = ToolSet> = Prompt & {
   readonly maxOutputTokens?: number | undefined;
   readonly abortSignal?: AbortSignal | undefined;
   readonly headers?: Readonly<Record<string, string>> | undefined;
-  readonly onStepFinish?: ((step: StepResult) => void | Promise<void>) | undefined;
+  readonly onStepFinish?:
+    | ((step: StepResult) => void | Promise<void>)
+    | undefined;
 };
 
-export const createMessages = (options: Prompt & { readonly system?: string | undefined }): ModelMessage[] => {
+export const createMessages = (
+  options: Prompt & { readonly system?: string | undefined },
+): ModelMessage[] => {
   const messages: ModelMessage[] = [];
-  if (options.system) messages.push({ role: "system", content: options.system });
-  if (options.prompt !== undefined) messages.push({ role: "user", content: options.prompt });
+  if (options.system)
+    messages.push({ role: "system", content: options.system });
+  if (options.prompt !== undefined)
+    messages.push({ role: "user", content: options.prompt });
   else messages.push(...options.messages);
   return messages;
 };
@@ -77,7 +83,11 @@ export const callModel = async (
   let lastError: unknown;
   for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
     if (request.abortSignal?.aborted) {
-      throw new AgentSdkError({ code: "ABORTED", message: "Generation was aborted", cause: request.abortSignal.reason });
+      throw new AgentSdkError({
+        code: "ABORTED",
+        message: "Generation was aborted",
+        cause: request.abortSignal.reason,
+      });
     }
     try {
       return await model.generate(request);
@@ -109,13 +119,22 @@ export const executeTool = async (
     });
   }
   try {
-    const output = await definition.invoke(call.input, { toolCallId: call.toolCallId, abortSignal });
-    return { role: "tool", toolCallId: call.toolCallId, toolName: call.toolName, output };
+    const output = await definition.invoke(call.input, {
+      toolCallId: call.toolCallId,
+      abortSignal,
+    });
+    return {
+      role: "tool",
+      toolCallId: call.toolCallId,
+      toolName: call.toolName,
+      output,
+    };
   } catch (error) {
     if (error instanceof ToolError) throw error;
-    const code = error instanceof AgentSdkError && error.code === "TOOL_INPUT_INVALID"
-      ? "TOOL_INPUT_INVALID"
-      : "TOOL_EXECUTION_FAILED";
+    const code =
+      error instanceof AgentSdkError && error.code === "TOOL_INPUT_INVALID"
+        ? "TOOL_INPUT_INVALID"
+        : "TOOL_EXECUTION_FAILED";
     throw new ToolError({
       code,
       message: `Tool "${call.toolName}" failed: ${getErrorMessage(error)}`,
@@ -132,10 +151,16 @@ export const generateText = async <Tools extends ToolSet = ToolSet>(
   const maxSteps = options.maxSteps ?? 1;
   const maxRetries = options.maxRetries ?? 2;
   if (!Number.isInteger(maxSteps) || maxSteps < 1) {
-    throw new AgentSdkError({ code: "INVALID_ARGUMENT", message: "maxSteps must be a positive integer" });
+    throw new AgentSdkError({
+      code: "INVALID_ARGUMENT",
+      message: "maxSteps must be a positive integer",
+    });
   }
   if (!Number.isInteger(maxRetries) || maxRetries < 0) {
-    throw new AgentSdkError({ code: "INVALID_ARGUMENT", message: "maxRetries must be a non-negative integer" });
+    throw new AgentSdkError({
+      code: "INVALID_ARGUMENT",
+      message: "maxRetries must be a non-negative integer",
+    });
   }
 
   const messages = createMessages(options);
@@ -144,14 +169,18 @@ export const generateText = async <Tools extends ToolSet = ToolSet>(
   let usage = zeroUsage();
 
   for (let index = 0; index < maxSteps; index += 1) {
-    const response = await callModel(options.model, {
-      messages: [...messages],
-      tools: toModelTools(options.tools),
-      temperature: options.temperature,
-      maxOutputTokens: options.maxOutputTokens,
-      abortSignal: options.abortSignal,
-      headers: options.headers,
-    }, maxRetries);
+    const response = await callModel(
+      options.model,
+      {
+        messages: [...messages],
+        tools: toModelTools(options.tools),
+        temperature: options.temperature,
+        maxOutputTokens: options.maxOutputTokens,
+        abortSignal: options.abortSignal,
+        headers: options.headers,
+      },
+      maxRetries,
+    );
 
     const assistantMessage: ModelMessage = {
       role: "assistant",
@@ -162,7 +191,9 @@ export const generateText = async <Tools extends ToolSet = ToolSet>(
     responseMessages.push(assistantMessage);
 
     const toolResults = await Promise.all(
-      response.toolCalls.map((call) => executeTool(call, options.tools?.[call.toolName], options.abortSignal)),
+      response.toolCalls.map((call) =>
+        executeTool(call, options.tools?.[call.toolName], options.abortSignal),
+      ),
     );
     messages.push(...toolResults);
     responseMessages.push(...toolResults);
