@@ -117,7 +117,39 @@ for await (const delta of stream.textStream) {
 const finalResult = await stream.result;
 ```
 
-When a provider implements `LanguageModel.stream`, events are forwarded as they arrive. Providers without native streaming fall back to complete-step events without pretending buffered output is token streaming.
+`fullStream` is the canonical bounded event stream. `textStream` is a text-only view over the same session. They are intentionally alternative views: consume one, not both. This avoids `ReadableStream.tee()` buffering while preserving provider backpressure. Await `result` after consuming the selected stream.
+
+Native and fallback models emit the same ordered SDK protocol:
+
+```text
+step-start -> text-start -> text-delta* -> text-end
+           -> tool-call* -> finish -> step-finish
+```
+
+Malformed provider ordering, duplicate or missing finish events, and events after finish produce a `StreamProtocolError`. Cancelling either consumer aborts the provider request and active tools.
+
+Retries and timeouts are configured consistently for generation and streaming:
+
+```ts
+const stream = streamText({
+  model,
+  prompt: "Explain the forecast",
+  retry: {
+    maxRetries: 2,
+    initialDelayMs: 100,
+    maxDelayMs: 5_000,
+    onRetry: ({ attempt, error }) => console.warn(attempt, error.code),
+  },
+  timeouts: {
+    requestMs: 60_000,
+    firstChunkMs: 15_000,
+    chunkMs: 15_000,
+    toolMs: 30_000,
+  },
+});
+```
+
+Only classified transient failures are retried. Once provider output is externally visible, a stream is never replayed. Errors expose stable codes, retry metadata, serializable `toJSON()` output, and `partialResult` when generation has already produced text, usage, messages, or completed steps.
 
 ## Safety And Type Guarantees
 
@@ -126,7 +158,10 @@ When a provider implements `LanguageModel.stream`, events are forwarded as they 
 - Prompt input is an exclusive union: provide `prompt` or `messages`, never both.
 - Tool loops are bounded with `maxSteps`.
 - Abort signals flow through model and tool calls.
-- Public failures use stable error codes through `AgentSdkError` and `ToolError`.
+- Request, first-chunk, per-chunk, and tool timeouts use `TimeoutError`.
+- Public failures use stable errors including `AbortError`, `NetworkError`, `StreamProtocolError`, and `ToolError`.
+- Provider responses and stream events are runtime validated before use.
+- Retries use capped exponential backoff, jitter, transient-failure classification, and `Retry-After` metadata.
 - The source contains no type assertions or unchecked JSON casts.
 
 ## Commands

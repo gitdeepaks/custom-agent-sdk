@@ -3,6 +3,8 @@ import {
   type GenerateTextOptions,
   type GenerateTextResult,
   type Prompt,
+  type RetryOptions,
+  type TimeoutOptions,
 } from "../generation/generate-text";
 import { streamText, type StreamTextResult } from "../generation/stream-text";
 import { AgentSdkError } from "../errors/errors";
@@ -15,6 +17,8 @@ export interface AgentSettings<Tools extends ToolSet> {
   readonly tools?: Tools | undefined;
   readonly maxSteps?: number | undefined;
   readonly maxRetries?: number | undefined;
+  readonly retry?: RetryOptions | undefined;
+  readonly timeouts?: TimeoutOptions | undefined;
   readonly temperature?: number | undefined;
   readonly maxOutputTokens?: number | undefined;
   readonly headers?: Readonly<Record<string, string>> | undefined;
@@ -52,6 +56,8 @@ export class Agent<Tools extends ToolSet = ToolSet> {
       tools: this.settings.tools,
       maxSteps: this.settings.maxSteps,
       maxRetries: this.settings.maxRetries,
+      retry: this.settings.retry,
+      timeouts: this.settings.timeouts,
       temperature: this.settings.temperature,
       maxOutputTokens: this.settings.maxOutputTokens,
       headers: this.settings.headers,

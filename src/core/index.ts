@@ -6,15 +6,27 @@ export {
 } from "./agent/agent";
 export {
   AgentSdkError,
+  AbortError,
+  ModelResponseError,
+  NetworkError,
+  StreamProtocolError,
+  TimeoutError,
   ToolError,
   type AgentSdkErrorCode,
+  type ErrorMetadata,
+  type SerializedAgentSdkError,
+  type TimeoutKind,
 } from "./errors/errors";
 export {
   generateText,
   type GenerateTextOptions,
   type GenerateTextResult,
+  type PartialGenerateTextResult,
   type Prompt,
+  type RetryEvent,
+  type RetryOptions,
   type StepResult,
+  type TimeoutOptions,
 } from "./generation/generate-text";
 export {
   streamText,

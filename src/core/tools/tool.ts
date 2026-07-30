@@ -78,6 +78,11 @@ export const toModelTools = (
       }))
     : [];
 
+export const getTool = (tools: ToolSet | undefined, name: string): AnyTool | undefined => {
+  if (!tools || !Object.hasOwn(tools, name)) return undefined;
+  return tools[name];
+};
+
 export const defineSchema = <T>(options: {
   readonly jsonSchema: JsonValue;
   readonly parse: (value: unknown) => T;

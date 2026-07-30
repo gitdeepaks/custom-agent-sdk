@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   Agent,
   AgentSdkError,
+  NetworkError,
   defineSchema,
   generateText,
   streamText,
@@ -15,12 +16,15 @@ import {
 
 const usage = { inputTokens: 4, outputTokens: 2, totalTokens: 6 };
 
-const response = (options: Partial<ModelResponse> = {}): ModelResponse => ({
-  text: options.text ?? "hello",
-  toolCalls: options.toolCalls ?? [],
-  finishReason: options.finishReason ?? "stop",
-  usage: options.usage ?? usage,
-});
+const response = (options: Partial<ModelResponse> = {}): ModelResponse => {
+  const toolCalls = options.toolCalls ?? [];
+  return {
+    text: options.text ?? "hello",
+    toolCalls,
+    finishReason: options.finishReason ?? (toolCalls.length > 0 ? "tool-calls" : "stop"),
+    usage: options.usage ?? usage,
+  };
+};
 
 class SequenceModel implements LanguageModel {
   readonly provider = "test";
@@ -132,7 +136,7 @@ describe("generateText", () => {
       modelId: "retry",
       async generate() {
         attempts += 1;
-        if (attempts < 2) throw new Error("temporary");
+        if (attempts < 2) throw new NetworkError({ message: "temporary" });
         return response({ text: "recovered" });
       },
     };
