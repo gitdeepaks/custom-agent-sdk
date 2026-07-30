@@ -181,3 +181,39 @@ test("Agent applies reusable settings", async () => {
   expect(result.text).toBe("agent response");
   expect(model.requests[0]?.messages[0]).toEqual({ role: "system", content: "Be concise" });
 });
+
+describe("Agent.builder", () => {
+  test("builds an agent with fluent instructions and tools", async () => {
+    const model = new SequenceModel([response({ text: "builder response" })]);
+    const first = tool({
+      name: "first",
+      description: "First tool",
+      inputSchema: defineSchema({ jsonSchema: { type: "null" }, parse: () => null }),
+      execute: () => "first",
+    });
+    const second = tool({
+      name: "second",
+      description: "Second tool",
+      inputSchema: defineSchema({ jsonSchema: { type: "null" }, parse: () => null }),
+      execute: () => "second",
+    });
+
+    const agent = Agent.builder()
+      .setModel(model)
+      .setInstructions("You are an expert coding agent")
+      .tool(first)
+      .toolList([second])
+      .build();
+    await agent.run({ prompt: "Create a file" });
+
+    expect(model.requests[0]?.messages[0]).toEqual({
+      role: "system",
+      content: "You are an expert coding agent",
+    });
+    expect(model.requests[0]?.tools.map(({ name }) => name)).toEqual(["first", "second"]);
+  });
+
+  test("requires a language model", () => {
+    expect(() => Agent.builder().build()).toThrow("Agent builder requires a language model");
+  });
+});

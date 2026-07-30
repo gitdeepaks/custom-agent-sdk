@@ -5,7 +5,8 @@ import {
   type Prompt,
 } from "../generation/generate-text";
 import { streamText, type StreamTextResult } from "../generation/stream-text";
-import type { ToolSet } from "../tools/tool";
+import { AgentSdkError } from "../errors/errors";
+import type { AnyTool, ToolSet } from "../tools/tool";
 import type { LanguageModel } from "../model/types";
 
 export interface AgentSettings<Tools extends ToolSet> {
@@ -25,6 +26,10 @@ export type AgentRunOptions = Prompt & {
 
 export class Agent<Tools extends ToolSet = ToolSet> {
   readonly settings: AgentSettings<Tools>;
+
+  static builder(model?: LanguageModel): AgentBuilder {
+    return new AgentBuilder(model);
+  }
 
   constructor(settings: AgentSettings<Tools>) {
     this.settings = settings;
@@ -55,5 +60,50 @@ export class Agent<Tools extends ToolSet = ToolSet> {
     return options.prompt !== undefined
       ? { ...shared, prompt: options.prompt }
       : { ...shared, messages: options.messages };
+  }
+}
+
+export class AgentBuilder {
+  private model: LanguageModel | undefined;
+  private instructions: string | undefined;
+  private readonly registeredTools = new Map<string, AnyTool>();
+
+  constructor(model?: LanguageModel) {
+    this.model = model;
+  }
+
+  setModel(model: LanguageModel): this {
+    this.model = model;
+    return this;
+  }
+
+  setInstructions(instructions: string): this {
+    this.instructions = instructions;
+    return this;
+  }
+
+  tool(definition: AnyTool): this {
+    this.registeredTools.set(definition.name, definition);
+    return this;
+  }
+
+  toolList(definitions: readonly AnyTool[]): this {
+    for (const definition of definitions) this.tool(definition);
+    return this;
+  }
+
+  build(): Agent {
+    if (!this.model) {
+      throw new AgentSdkError({
+        code: "INVALID_ARGUMENT",
+        message: "Agent builder requires a language model",
+      });
+    }
+
+    return new Agent({
+      model: this.model,
+      instructions: this.instructions,
+      tools: Object.fromEntries(this.registeredTools),
+    });
   }
 }

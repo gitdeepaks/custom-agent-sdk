@@ -1,4 +1,9 @@
-export { Agent, type AgentRunOptions, type AgentSettings } from "./agent/agent";
+export {
+  Agent,
+  AgentBuilder,
+  type AgentRunOptions,
+  type AgentSettings,
+} from "./agent/agent";
 export {
   AgentSdkError,
   ToolError,
@@ -22,6 +27,7 @@ export {
   type AnyTool,
   type InferToolInput,
   type InferToolOutput,
+  type ITool,
   type Schema,
   type Tool,
   type ToolExecutionContext,

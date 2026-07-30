@@ -96,6 +96,15 @@ const result = await agent.run({ prompt: "What is the weather in Delhi?" });
 console.log(result.text);
 ```
 
+The same agent can be created with the fluent builder API:
+
+```ts
+const agent = Agent.builder(model)
+  .setInstructions("You are an expert weather agent.")
+  .tool(weather)
+  .build();
+```
+
 ## Streaming
 
 ```ts

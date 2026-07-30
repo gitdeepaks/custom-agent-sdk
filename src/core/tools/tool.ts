@@ -30,6 +30,8 @@ export interface AnyTool {
   invoke(value: unknown, context: ToolExecutionContext): Promise<unknown>;
 }
 
+export type ITool = AnyTool;
+
 export type ToolSet = Readonly<Record<string, AnyTool>>;
 
 export type InferToolInput<ToolType> =
