@@ -83,18 +83,27 @@ const isRecord = (value: unknown): value is UnknownRecord =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
 const isJsonValue = (value: unknown): value is JsonValue => {
-  if (value === null || typeof value === "string" || typeof value === "boolean") return true;
+  if (value === null || typeof value === "string" || typeof value === "boolean")
+    return true;
   if (typeof value === "number") return Number.isFinite(value);
   if (Array.isArray(value)) return value.every(isJsonValue);
   return isRecord(value) && Object.values(value).every(isJsonValue);
 };
 
-const optionalString = (record: UnknownRecord, key: string): string | undefined =>
+const optionalString = (
+  record: UnknownRecord,
+  key: string,
+): string | undefined =>
   typeof record[key] === "string" ? record[key] : undefined;
 
-const optionalNumber = (record: UnknownRecord, key: string): number | undefined => {
+const optionalNumber = (
+  record: UnknownRecord,
+  key: string,
+): number | undefined => {
   const value = record[key];
-  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+  return typeof value === "number" && Number.isFinite(value)
+    ? value
+    : undefined;
 };
 
 const eventItemId = (record: UnknownRecord): string | undefined => {
@@ -107,16 +116,22 @@ const eventItemId = (record: UnknownRecord): string | undefined => {
 };
 
 const encodeBase64 = (data: Uint8Array): string => {
-  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  const alphabet =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
   let result = "";
   for (let index = 0; index < data.length; index += 3) {
     const first = data[index] ?? 0;
     const second = data[index + 1];
     const third = data[index + 2];
     result += alphabet[Math.floor(first / 4)] ?? "";
-    result += alphabet[((first & 3) << 4) | Math.floor((second ?? 0) / 16)] ?? "";
-    result += second === undefined ? "=" : alphabet[((second & 15) << 2) | Math.floor((third ?? 0) / 64)] ?? "";
-    result += third === undefined ? "=" : alphabet[third & 63] ?? "";
+    result +=
+      alphabet[((first & 3) << 4) | Math.floor((second ?? 0) / 16)] ?? "";
+    result +=
+      second === undefined
+        ? "="
+        : (alphabet[((second & 15) << 2) | Math.floor((third ?? 0) / 64)] ??
+          "");
+    result += third === undefined ? "=" : (alphabet[third & 63] ?? "");
   }
   return result;
 };
@@ -126,7 +141,8 @@ const dataReference = (
   mediaType: string,
 ): string => {
   if (data instanceof URL) return data.toString();
-  if (data instanceof Uint8Array) return `data:${mediaType};base64,${encodeBase64(data)}`;
+  if (data instanceof Uint8Array)
+    return `data:${mediaType};base64,${encodeBase64(data)}`;
   if (/^(?:https?:|data:)/i.test(data)) return data;
   return `data:${mediaType};base64,${data}`;
 };
@@ -172,17 +188,26 @@ const toInputContent = (
   warnings: ProviderWarning[],
 ): readonly UnknownRecord[] => {
   if (typeof content === "string") {
-    return [{ type: role === "assistant" ? "output_text" : "input_text", text: content }];
+    return [
+      {
+        type: role === "assistant" ? "output_text" : "input_text",
+        text: content,
+      },
+    ];
   }
 
   const result: UnknownRecord[] = [];
   for (const part of content) {
     if (part.type === "text") {
-      result.push({ type: role === "assistant" ? "output_text" : "input_text", text: part.text });
+      result.push({
+        type: role === "assistant" ? "output_text" : "input_text",
+        text: part.text,
+      });
     } else if (part.type === "image") {
       if (role !== "user") {
         throw new UnsupportedFeatureError({
-          message: "OpenAI Responses only accepts image content in user messages",
+          message:
+            "OpenAI Responses only accepts image content in user messages",
           provider: "openai",
         });
       }
@@ -194,27 +219,35 @@ const toInputContent = (
     } else if (part.type === "file") {
       if (role !== "user") {
         throw new UnsupportedFeatureError({
-          message: "OpenAI Responses only accepts file content in user messages",
+          message:
+            "OpenAI Responses only accepts file content in user messages",
           provider: "openai",
         });
       }
       const reference = dataReference(part.data, part.mediaType);
-      result.push(reference.startsWith("http")
-        ? { type: "input_file", file_url: reference }
-        : {
-            type: "input_file",
-            file_data: reference,
-            ...(part.filename === undefined ? {} : { filename: part.filename }),
-          });
+      result.push(
+        reference.startsWith("http")
+          ? { type: "input_file", file_url: reference }
+          : {
+              type: "input_file",
+              file_data: reference,
+              ...(part.filename === undefined
+                ? {}
+                : { filename: part.filename }),
+            },
+      );
     } else if (part.type === "refusal" && role === "assistant") {
       result.push({ type: "refusal", refusal: part.refusal });
     } else if (part.type === "audio") {
       throw new UnsupportedFeatureError({
-        message: "OpenAI Responses input audio is not supported by this adapter",
+        message:
+          "OpenAI Responses input audio is not supported by this adapter",
         provider: "openai",
       });
     } else if (part.type !== "tool-call" && part.type !== "tool-result") {
-      warnings.push(warning(`OpenAI ignored ${part.type} content in a ${role} message`));
+      warnings.push(
+        warning(`OpenAI ignored ${part.type} content in a ${role} message`),
+      );
     }
   }
   return result;
@@ -224,7 +257,10 @@ const toolCallItem = (toolCall: ToolCall): UnknownRecord => ({
   type: "function_call",
   call_id: toolCall.toolCallId,
   name: toolCall.toolName,
-  arguments: serializeValue(toolCall.input, `Input for tool ${toolCall.toolName}`),
+  arguments: serializeValue(
+    toolCall.input,
+    `Input for tool ${toolCall.toolName}`,
+  ),
 });
 
 const toolResultItem = (
@@ -245,17 +281,22 @@ const messageItems = (
   warnings: ProviderWarning[],
 ): readonly UnknownRecord[] => {
   if (message.role === "tool") {
-    return [toolResultItem(message.toolCallId, message.output, message.isError)];
+    return [
+      toolResultItem(message.toolCallId, message.output, message.isError),
+    ];
   }
 
   const content = toInputContent(message.role, message.content, warnings);
-  const items: UnknownRecord[] = content.length === 0
-    ? []
-    : [{ type: "message", role: message.role, content }];
+  const items: UnknownRecord[] =
+    content.length === 0
+      ? []
+      : [{ type: "message", role: message.role, content }];
 
   if (message.role === "assistant") {
     const callIds = new Set<string>();
-    for (const part of typeof message.content === "string" ? [] : message.content) {
+    for (const part of typeof message.content === "string"
+      ? []
+      : message.content) {
       if (part.type === "tool-call") {
         items.push(toolCallItem(part));
         callIds.add(part.toolCallId);
@@ -268,7 +309,9 @@ const messageItems = (
       if (!callIds.has(call.toolCallId)) items.push(toolCallItem(call));
     }
   } else if (message.role === "user" || message.role === "system") {
-    for (const part of typeof message.content === "string" ? [] : message.content) {
+    for (const part of typeof message.content === "string"
+      ? []
+      : message.content) {
       if (part.type === "tool-result") {
         items.push(toolResultItem(part.toolCallId, part.output, part.isError));
       }
@@ -284,20 +327,26 @@ const providerOptions = (
 ): UnknownRecord => {
   const result: Record<string, unknown> = {};
   if (settings) {
-    if (settings.background !== undefined) result["background"] = settings.background;
+    if (settings.background !== undefined)
+      result["background"] = settings.background;
     if (settings.include !== undefined) result["include"] = settings.include;
-    if (settings.instructions !== undefined) result["instructions"] = settings.instructions;
+    if (settings.instructions !== undefined)
+      result["instructions"] = settings.instructions;
     if (settings.metadata !== undefined) result["metadata"] = settings.metadata;
     if (settings.parallelToolCalls !== undefined)
       result["parallel_tool_calls"] = settings.parallelToolCalls;
     if (settings.previousResponseId !== undefined)
       result["previous_response_id"] = settings.previousResponseId;
-    if (settings.reasoning !== undefined) result["reasoning"] = settings.reasoning;
-    if (settings.serviceTier !== undefined) result["service_tier"] = settings.serviceTier;
+    if (settings.reasoning !== undefined)
+      result["reasoning"] = settings.reasoning;
+    if (settings.serviceTier !== undefined)
+      result["service_tier"] = settings.serviceTier;
     if (settings.store !== undefined) result["store"] = settings.store;
     if (settings.text !== undefined) result["text"] = settings.text;
-    if (settings.toolChoice !== undefined) result["tool_choice"] = settings.toolChoice;
-    if (settings.truncation !== undefined) result["truncation"] = settings.truncation;
+    if (settings.toolChoice !== undefined)
+      result["tool_choice"] = settings.toolChoice;
+    if (settings.truncation !== undefined)
+      result["truncation"] = settings.truncation;
     if (settings.user !== undefined) result["user"] = settings.user;
   }
   const options = request.providerOptions;
@@ -319,7 +368,10 @@ const providerOptions = (
   ]);
   for (const [key, value] of Object.entries(options)) {
     if (supported.has(key)) result[key] = value;
-    else warnings.push(warning(`OpenAI provider option "${key}" is not supported`));
+    else
+      warnings.push(
+        warning(`OpenAI provider option "${key}" is not supported`),
+      );
   }
   return result;
 };
@@ -331,7 +383,9 @@ const prepareRequest = (
   settings: OpenAIModelSettings | undefined,
 ): PreparedRequest => {
   const warnings: ProviderWarning[] = [];
-  const input = request.messages.flatMap((message) => messageItems(message, warnings));
+  const input = request.messages.flatMap((message) =>
+    messageItems(message, warnings),
+  );
   const tools = request.tools.map((tool) => ({
     type: "function",
     name: tool.name,
@@ -346,8 +400,12 @@ const prepareRequest = (
       input,
       stream,
       ...(tools.length === 0 ? {} : { tools }),
-      ...(request.temperature === undefined ? {} : { temperature: request.temperature }),
-      ...(request.maxOutputTokens === undefined ? {} : { max_output_tokens: request.maxOutputTokens }),
+      ...(request.temperature === undefined
+        ? {}
+        : { temperature: request.temperature }),
+      ...(request.maxOutputTokens === undefined
+        ? {}
+        : { max_output_tokens: request.maxOutputTokens }),
     },
     warnings,
   };
@@ -361,7 +419,11 @@ const readUsage = (
   const inputTokens = optionalNumber(value, "input_tokens");
   const outputTokens = optionalNumber(value, "output_tokens");
   const totalTokens = optionalNumber(value, "total_tokens");
-  if (inputTokens === undefined || outputTokens === undefined || totalTokens === undefined) {
+  if (
+    inputTokens === undefined ||
+    outputTokens === undefined ||
+    totalTokens === undefined
+  ) {
     throw error("OpenAI response usage is invalid");
   }
   const inputDetails = isRecord(value["input_tokens_details"])
@@ -374,30 +436,38 @@ const readUsage = (
     inputTokens,
     outputTokens,
     totalTokens,
-    ...(inputDetails === undefined || optionalNumber(inputDetails, "cached_tokens") === undefined
+    ...(inputDetails === undefined ||
+    optionalNumber(inputDetails, "cached_tokens") === undefined
       ? {}
       : { cachedInputTokens: optionalNumber(inputDetails, "cached_tokens") }),
-    ...(outputDetails === undefined || optionalNumber(outputDetails, "reasoning_tokens") === undefined
+    ...(outputDetails === undefined ||
+    optionalNumber(outputDetails, "reasoning_tokens") === undefined
       ? {}
       : { reasoningTokens: optionalNumber(outputDetails, "reasoning_tokens") }),
   };
 };
 
-const finishReason = (response: UnknownRecord, hasToolCalls: boolean): FinishReason => {
+const finishReason = (
+  response: UnknownRecord,
+  hasToolCalls: boolean,
+): FinishReason => {
   if (hasToolCalls) return "tool-calls";
   const status = optionalString(response, "status");
   if (status === "failed" || status === "cancelled") return "error";
   const details = isRecord(response["incomplete_details"])
     ? response["incomplete_details"]
     : undefined;
-  const reason = details === undefined ? undefined : optionalString(details, "reason");
+  const reason =
+    details === undefined ? undefined : optionalString(details, "reason");
   if (reason === "max_output_tokens") return "length";
   if (reason === "content_filter") return "content-filter";
   if (status === "incomplete") return "other";
   return "stop";
 };
 
-const responseMetadata = (response: UnknownRecord): ProviderMetadata | undefined => {
+const responseMetadata = (
+  response: UnknownRecord,
+): ProviderMetadata | undefined => {
   const metadata = response["metadata"];
   const status = optionalString(response, "status");
   const serviceTier = optionalString(response, "service_tier");
@@ -417,9 +487,11 @@ const parseResponse = (
     streamError
       ? new StreamProtocolError({ message, provider: "openai", modelId, cause })
       : new ModelResponseError({ message, provider: "openai", modelId, cause });
-  if (!isRecord(value)) throw makeError("OpenAI returned a non-object response");
+  if (!isRecord(value))
+    throw makeError("OpenAI returned a non-object response");
   const output = value["output"];
-  if (!Array.isArray(output)) throw makeError("OpenAI response output is missing");
+  if (!Array.isArray(output))
+    throw makeError("OpenAI response output is missing");
 
   let text = "";
   const content: ContentPart[] = [];
@@ -438,12 +510,14 @@ const parseResponse = (
         }
         if (part["type"] === "output_text") {
           const partText = optionalString(part, "text");
-          if (partText === undefined) throw makeError("OpenAI output text is invalid");
+          if (partText === undefined)
+            throw makeError("OpenAI output text is invalid");
           text += partText;
           content.push({ type: "text", text: partText });
         } else if (part["type"] === "refusal") {
           const refusal = optionalString(part, "refusal");
-          if (refusal === undefined) throw makeError("OpenAI refusal is invalid");
+          if (refusal === undefined)
+            throw makeError("OpenAI refusal is invalid");
           content.push({ type: "refusal", refusal });
         }
       }
@@ -451,7 +525,11 @@ const parseResponse = (
       const callId = optionalString(item, "call_id");
       const name = optionalString(item, "name");
       const argumentText = optionalString(item, "arguments");
-      if (callId === undefined || name === undefined || argumentText === undefined) {
+      if (
+        callId === undefined ||
+        name === undefined ||
+        argumentText === undefined
+      ) {
         throw makeError("OpenAI returned an invalid function call");
       }
       const call: ToolCall = {
@@ -470,7 +548,8 @@ const parseResponse = (
   }
 
   const createdAt = optionalNumber(value, "created_at");
-  const timestamp = createdAt === undefined ? undefined : new Date(createdAt * 1_000);
+  const timestamp =
+    createdAt === undefined ? undefined : new Date(createdAt * 1_000);
   return {
     text,
     content,
@@ -506,12 +585,22 @@ const httpError = (response: Response, modelId: string): AgentSdkError => {
     retryAfterMs: retryAfterMs(response.headers),
   };
   if (response.status === 401 || response.status === 403) {
-    return new AuthenticationError({ ...options, message: "OpenAI authentication failed" });
+    return new AuthenticationError({
+      ...options,
+      message: "OpenAI authentication failed",
+    });
   }
   if (response.status === 429) {
-    return new RateLimitError({ ...options, message: "OpenAI rate limit exceeded" });
+    return new RateLimitError({
+      ...options,
+      message: "OpenAI rate limit exceeded",
+    });
   }
-  if (response.status === 408 || response.status === 409 || response.status === 425) {
+  if (
+    response.status === 408 ||
+    response.status === 409 ||
+    response.status === 425
+  ) {
     return new AgentSdkError({
       code: "MODEL_ERROR",
       message: "OpenAI is temporarily unavailable",
@@ -520,17 +609,26 @@ const httpError = (response: Response, modelId: string): AgentSdkError => {
     });
   }
   if (response.status >= 400 && response.status < 500) {
-    return new InvalidRequestError({ ...options, message: "OpenAI rejected the request" });
+    return new InvalidRequestError({
+      ...options,
+      message: "OpenAI rejected the request",
+    });
   }
   return new AgentSdkError({
     code: "MODEL_ERROR",
     message: "OpenAI is temporarily unavailable",
-    retryable: response.status === 408 || response.status === 409 || response.status >= 500,
+    retryable:
+      response.status === 408 ||
+      response.status === 409 ||
+      response.status >= 500,
     ...options,
   });
 };
 
-const abortError = (signal: AbortSignal | undefined, modelId: string): AbortError =>
+const abortError = (
+  signal: AbortSignal | undefined,
+  modelId: string,
+): AbortError =>
   new AbortError({
     message: "OpenAI request was aborted",
     provider: "openai",
@@ -545,14 +643,18 @@ const requestHeaders = (
   stream: boolean,
 ): Headers => {
   const headers = new Headers(configured);
-  for (const [name, value] of Object.entries(request ?? {})) headers.set(name, value);
+  for (const [name, value] of Object.entries(request ?? {}))
+    headers.set(name, value);
   headers.set("authorization", `Bearer ${apiKey}`);
   headers.set("content-type", "application/json");
   headers.set("accept", stream ? "text/event-stream" : "application/json");
   return headers;
 };
 
-const parseJsonResponse = async (response: Response, modelId: string): Promise<unknown> => {
+const parseJsonResponse = async (
+  response: Response,
+  modelId: string,
+): Promise<unknown> => {
   try {
     const value: unknown = await response.json();
     return value;
@@ -609,9 +711,18 @@ const streamFromResponse = (
   let finished = false;
 
   const streamError = (message: string, cause?: unknown): StreamProtocolError =>
-    new StreamProtocolError({ message, provider: "openai", modelId, requestId, cause });
+    new StreamProtocolError({
+      message,
+      provider: "openai",
+      modelId,
+      requestId,
+      cause,
+    });
 
-  const emitCall = (call: StreamToolCall, controller: ReadableStreamDefaultController<ModelStreamPart>): void => {
+  const emitCall = (
+    call: StreamToolCall,
+    controller: ReadableStreamDefaultController<ModelStreamPart>,
+  ): void => {
     if (call.emitted) return;
     if (call.callId === undefined || call.name === undefined) {
       throw streamError("OpenAI function-call stream is missing call metadata");
@@ -638,15 +749,18 @@ const streamFromResponse = (
     const type = value["type"];
     if (type === "response.output_text.delta") {
       const delta = optionalString(value, "delta");
-      if (delta === undefined) throw streamError("OpenAI text delta is invalid");
-      if (delta.length > 0) controller.enqueue({ type: "text-delta", text: delta });
+      if (delta === undefined)
+        throw streamError("OpenAI text delta is invalid");
+      if (delta.length > 0)
+        controller.enqueue({ type: "text-delta", text: delta });
       return;
     }
     if (type === "response.output_item.added") {
       const item = value["item"];
       if (isRecord(item) && item["type"] === "function_call") {
         const itemId = eventItemId(value) ?? optionalString(item, "id");
-        if (itemId === undefined) throw streamError("OpenAI function call has no item id");
+        if (itemId === undefined)
+          throw streamError("OpenAI function call has no item id");
         calls.set(itemId, {
           itemId,
           callId: optionalString(item, "call_id"),
@@ -676,12 +790,18 @@ const streamFromResponse = (
       const item = value["item"];
       if (isRecord(item) && item["type"] === "function_call") {
         const itemId = eventItemId(value) ?? optionalString(item, "id");
-        if (itemId === undefined) throw streamError("OpenAI completed function call has no item id");
-        const existing = calls.get(itemId) ?? { itemId, arguments: "", emitted: false };
+        if (itemId === undefined)
+          throw streamError("OpenAI completed function call has no item id");
+        const existing = calls.get(itemId) ?? {
+          itemId,
+          arguments: "",
+          emitted: false,
+        };
         existing.callId = optionalString(item, "call_id") ?? existing.callId;
         existing.name = optionalString(item, "name") ?? existing.name;
         const completeArguments = optionalString(item, "arguments");
-        if (completeArguments !== undefined) existing.arguments = completeArguments;
+        if (completeArguments !== undefined)
+          existing.arguments = completeArguments;
         calls.set(itemId, existing);
         emitCall(existing, controller);
       }
@@ -733,7 +853,8 @@ const streamFromResponse = (
               throw streamError("OpenAI returned malformed SSE JSON", cause);
             }
             processEvent(event, controller);
-            if (controller.desiredSize !== null && controller.desiredSize <= 0) return;
+            if (controller.desiredSize !== null && controller.desiredSize <= 0)
+              return;
             continue;
           }
 
@@ -746,11 +867,17 @@ const streamFromResponse = (
               try {
                 event = JSON.parse(data);
               } catch (cause) {
-                throw streamError("OpenAI returned malformed final SSE JSON", cause);
+                throw streamError(
+                  "OpenAI returned malformed final SSE JSON",
+                  cause,
+                );
               }
               processEvent(event, controller);
             }
-            if (!finished) throw streamError("OpenAI event stream ended before a finish event");
+            if (!finished)
+              throw streamError(
+                "OpenAI event stream ended before a finish event",
+              );
             controller.close();
             return;
           }
@@ -761,15 +888,19 @@ const streamFromResponse = (
         if (signal?.aborted) controller.error(abortError(signal, modelId));
         else if (AgentSdkError.isInstance(error)) controller.error(error);
         else if (error instanceof TypeError) {
-          controller.error(new NetworkError({
-            message: "OpenAI event stream network request failed",
-            provider: "openai",
-            modelId,
-            requestId,
-            cause: error,
-          }));
-        }
-        else controller.error(streamError("Failed while reading the OpenAI event stream", error));
+          controller.error(
+            new NetworkError({
+              message: "OpenAI event stream network request failed",
+              provider: "openai",
+              modelId,
+              requestId,
+              cause: error,
+            }),
+          );
+        } else
+          controller.error(
+            streamError("Failed while reading the OpenAI event stream", error),
+          );
         void reader.cancel().catch(() => undefined);
       }
     },
@@ -790,11 +921,15 @@ export class OpenAIResponsesLanguageModel implements LanguageModel {
     this.modelId = config.modelId;
   }
 
-  async #fetch(request: ModelRequest, stream: boolean): Promise<{
+  async #fetch(
+    request: ModelRequest,
+    stream: boolean,
+  ): Promise<{
     readonly response: Response;
     readonly warnings: readonly ProviderWarning[];
   }> {
-    if (request.abortSignal?.aborted) throw abortError(request.abortSignal, this.modelId);
+    if (request.abortSignal?.aborted)
+      throw abortError(request.abortSignal, this.modelId);
     const prepared = prepareRequest(
       request,
       this.modelId,
@@ -812,10 +947,13 @@ export class OpenAIResponsesLanguageModel implements LanguageModel {
           stream,
         ),
         body: JSON.stringify(prepared.body),
-        ...(request.abortSignal === undefined ? {} : { signal: request.abortSignal }),
+        ...(request.abortSignal === undefined
+          ? {}
+          : { signal: request.abortSignal }),
       });
     } catch (cause) {
-      if (request.abortSignal?.aborted) throw abortError(request.abortSignal, this.modelId);
+      if (request.abortSignal?.aborted)
+        throw abortError(request.abortSignal, this.modelId);
       throw new NetworkError({
         message: "OpenAI network request failed",
         provider: "openai",
@@ -850,7 +988,9 @@ export class OpenAIResponsesLanguageModel implements LanguageModel {
     };
   }
 
-  async stream(request: ModelRequest): Promise<ReadableStream<ModelStreamPart>> {
+  async stream(
+    request: ModelRequest,
+  ): Promise<ReadableStream<ModelStreamPart>> {
     const { response, warnings } = await this.#fetch(request, true);
     const requestId = response.headers.get("x-request-id") ?? undefined;
     return streamFromResponse(

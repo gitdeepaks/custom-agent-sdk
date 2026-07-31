@@ -164,7 +164,10 @@ export class NetworkError extends AgentSdkError {
 
 export class AuthenticationError extends AgentSdkError {
   constructor(
-    options: ErrorMetadata & { readonly message?: string; readonly cause?: unknown } = {},
+    options: ErrorMetadata & {
+      readonly message?: string;
+      readonly cause?: unknown;
+    } = {},
   ) {
     super({
       code: "AUTHENTICATION_ERROR",
@@ -177,7 +180,10 @@ export class AuthenticationError extends AgentSdkError {
 
 export class RateLimitError extends AgentSdkError {
   constructor(
-    options: ErrorMetadata & { readonly message?: string; readonly cause?: unknown } = {},
+    options: ErrorMetadata & {
+      readonly message?: string;
+      readonly cause?: unknown;
+    } = {},
   ) {
     super({
       code: "RATE_LIMIT_ERROR",
@@ -191,7 +197,10 @@ export class RateLimitError extends AgentSdkError {
 
 export class InvalidRequestError extends AgentSdkError {
   constructor(
-    options: ErrorMetadata & { readonly message?: string; readonly cause?: unknown } = {},
+    options: ErrorMetadata & {
+      readonly message?: string;
+      readonly cause?: unknown;
+    } = {},
   ) {
     super({
       code: "INVALID_REQUEST",
@@ -204,7 +213,10 @@ export class InvalidRequestError extends AgentSdkError {
 
 export class UnsupportedFeatureError extends AgentSdkError {
   constructor(
-    options: ErrorMetadata & { readonly message: string; readonly cause?: unknown },
+    options: ErrorMetadata & {
+      readonly message: string;
+      readonly cause?: unknown;
+    },
   ) {
     super({ code: "UNSUPPORTED_FEATURE", ...options });
     this.name = "UnsupportedFeatureError";

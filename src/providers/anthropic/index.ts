@@ -107,7 +107,11 @@ type EventResult = "none" | "emitted" | "finished";
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
-const responseError = (modelId: string, message: string, requestId?: string): ModelResponseError =>
+const responseError = (
+  modelId: string,
+  message: string,
+  requestId?: string,
+): ModelResponseError =>
   new ModelResponseError({
     message: `Invalid Anthropic response: ${message}`,
     provider: PROVIDER,
@@ -115,7 +119,11 @@ const responseError = (modelId: string, message: string, requestId?: string): Mo
     requestId,
   });
 
-const streamError = (modelId: string, message: string, requestId?: string): StreamProtocolError =>
+const streamError = (
+  modelId: string,
+  message: string,
+  requestId?: string,
+): StreamProtocolError =>
   new StreamProtocolError({
     message: `Invalid Anthropic stream: ${message}`,
     provider: PROVIDER,
@@ -129,7 +137,8 @@ const requireRecord = (
   label: string,
   requestId?: string,
 ): Record<string, unknown> => {
-  if (!isRecord(value)) throw responseError(modelId, `${label} must be an object`, requestId);
+  if (!isRecord(value))
+    throw responseError(modelId, `${label} must be an object`, requestId);
   return value;
 };
 
@@ -151,7 +160,11 @@ const requireNonNegativeNumber = (
   requestId?: string,
 ): number => {
   if (typeof value !== "number" || !Number.isFinite(value) || value < 0)
-    throw responseError(modelId, `${label} must be a non-negative number`, requestId);
+    throw responseError(
+      modelId,
+      `${label} must be a non-negative number`,
+      requestId,
+    );
   return value;
 };
 
@@ -178,7 +191,10 @@ const toBase64 = (data: Uint8Array): string => {
   return btoa(binary);
 };
 
-const binarySource = (data: string | Uint8Array, mediaType: string): unknown => ({
+const binarySource = (
+  data: string | Uint8Array,
+  mediaType: string,
+): unknown => ({
   type: "base64",
   media_type: mediaType,
   data: typeof data === "string" ? data : toBase64(data),
@@ -234,19 +250,25 @@ const userBlocks = (
   warnings: ProviderWarning[],
 ): unknown[] => {
   if (message.role === "tool")
-    return [{
-      type: "tool_result",
-      tool_use_id: message.toolCallId,
-      content: serializeToolOutput(message.output, modelId),
-      is_error: message.isError ?? false,
-    }];
-  if (typeof message.content === "string") return [{ type: "text", text: message.content }];
+    return [
+      {
+        type: "tool_result",
+        tool_use_id: message.toolCallId,
+        content: serializeToolOutput(message.output, modelId),
+        is_error: message.isError ?? false,
+      },
+    ];
+  if (typeof message.content === "string")
+    return [{ type: "text", text: message.content }];
   const blocks: unknown[] = [];
   for (const part of message.content) {
     if (part.type === "text") blocks.push({ type: "text", text: part.text });
     else if (part.type === "image") {
       const mediaType = part.mediaType ?? "image/jpeg";
-      blocks.push({ type: "image", source: contentSource(part.data, mediaType) });
+      blocks.push({
+        type: "image",
+        source: contentSource(part.data, mediaType),
+      });
     } else if (part.type === "file") {
       blocks.push({
         type: "document",
@@ -261,7 +283,10 @@ const userBlocks = (
         is_error: part.isError ?? false,
       });
     } else if (part.type === "provider-metadata") {
-      warnings.push({ type: "unsupported", message: "Anthropic ignores provider metadata content" });
+      warnings.push({
+        type: "unsupported",
+        message: "Anthropic ignores provider metadata content",
+      });
     } else {
       throw new UnsupportedFeatureError({
         message: `Anthropic user messages do not support ${part.type} content`,
@@ -282,7 +307,8 @@ const assistantBlocks = (
   const blocks: unknown[] = [];
   const callIds = new Set<string>();
   if (typeof message.content === "string") {
-    if (message.content.length > 0) blocks.push({ type: "text", text: message.content });
+    if (message.content.length > 0)
+      blocks.push({ type: "text", text: message.content });
   } else {
     for (const part of message.content) {
       if (part.type === "text") blocks.push({ type: "text", text: part.text });
@@ -294,9 +320,17 @@ const assistantBlocks = (
             modelId,
           });
         callIds.add(part.toolCallId);
-        blocks.push({ type: "tool_use", id: part.toolCallId, name: part.toolName, input: part.input });
+        blocks.push({
+          type: "tool_use",
+          id: part.toolCallId,
+          name: part.toolName,
+          input: part.input,
+        });
       } else if (part.type === "provider-metadata") {
-        warnings.push({ type: "unsupported", message: "Anthropic ignores provider metadata content" });
+        warnings.push({
+          type: "unsupported",
+          message: "Anthropic ignores provider metadata content",
+        });
       } else {
         throw new UnsupportedFeatureError({
           message: `Anthropic assistant messages do not support ${part.type} content`,
@@ -314,7 +348,12 @@ const assistantBlocks = (
         modelId,
       });
     if (!callIds.has(call.toolCallId))
-      blocks.push({ type: "tool_use", id: call.toolCallId, name: call.toolName, input: call.input });
+      blocks.push({
+        type: "tool_use",
+        id: call.toolCallId,
+        name: call.toolName,
+        input: call.input,
+      });
   }
   return blocks;
 };
@@ -344,7 +383,10 @@ const readProviderOptions = (
   const supported = new Set(["topP", "topK", "stopSequences", "metadata"]);
   for (const key of Object.keys(request.providerOptions)) {
     if (!supported.has(key))
-      warnings.push({ type: "unsupported", message: `Anthropic provider option "${key}" is ignored` });
+      warnings.push({
+        type: "unsupported",
+        message: `Anthropic provider option "${key}" is ignored`,
+      });
   }
   const topP = request.providerOptions["topP"];
   const topK = request.providerOptions["topK"];
@@ -352,17 +394,32 @@ const readProviderOptions = (
   const metadata = request.providerOptions["metadata"];
   if (typeof topP === "number") body["top_p"] = topP;
   else if (topP !== undefined)
-    warnings.push({ type: "unsupported", message: "Anthropic topP must be a number" });
+    warnings.push({
+      type: "unsupported",
+      message: "Anthropic topP must be a number",
+    });
   if (typeof topK === "number") body["top_k"] = topK;
   else if (topK !== undefined)
-    warnings.push({ type: "unsupported", message: "Anthropic topK must be a number" });
-  if (Array.isArray(stopSequences) && stopSequences.every((value) => typeof value === "string"))
+    warnings.push({
+      type: "unsupported",
+      message: "Anthropic topK must be a number",
+    });
+  if (
+    Array.isArray(stopSequences) &&
+    stopSequences.every((value) => typeof value === "string")
+  )
     body["stop_sequences"] = stopSequences;
   else if (stopSequences !== undefined)
-    warnings.push({ type: "unsupported", message: "Anthropic stopSequences must contain strings" });
+    warnings.push({
+      type: "unsupported",
+      message: "Anthropic stopSequences must contain strings",
+    });
   if (isRecord(metadata)) body["metadata"] = metadata;
   else if (metadata !== undefined)
-    warnings.push({ type: "unsupported", message: "Anthropic metadata must be an object" });
+    warnings.push({
+      type: "unsupported",
+      message: "Anthropic metadata must be an object",
+    });
 };
 
 const prepareRequest = (
@@ -393,7 +450,11 @@ const prepareRequest = (
       const text = systemText(message, modelId);
       if (text.length > 0) system.push(text);
     } else if (message.role === "assistant") {
-      appendMessage(messages, "assistant", assistantBlocks(message, modelId, warnings));
+      appendMessage(
+        messages,
+        "assistant",
+        assistantBlocks(message, modelId, warnings),
+      );
     } else {
       appendMessage(messages, "user", userBlocks(message, modelId, warnings));
     }
@@ -405,7 +466,8 @@ const prepareRequest = (
     stream,
   };
   if (system.length > 0) body["system"] = system.join("\n\n");
-  if (request.temperature !== undefined) body["temperature"] = request.temperature;
+  if (request.temperature !== undefined)
+    body["temperature"] = request.temperature;
   if (request.tools.length > 0)
     body["tools"] = request.tools.map((tool) => ({
       name: tool.name,
@@ -422,14 +484,36 @@ const parseUsage = (
   requestId?: string,
 ): { usage: Usage; metadata: ProviderMetadata } => {
   const object = requireRecord(value, modelId, "usage", requestId);
-  const inputTokens = requireNonNegativeNumber(object["input_tokens"], modelId, "usage.input_tokens", requestId);
-  const outputTokens = requireNonNegativeNumber(object["output_tokens"], modelId, "usage.output_tokens", requestId);
-  const cacheRead = object["cache_read_input_tokens"] === undefined
-    ? 0
-    : requireNonNegativeNumber(object["cache_read_input_tokens"], modelId, "usage.cache_read_input_tokens", requestId);
-  const cacheCreation = object["cache_creation_input_tokens"] === undefined
-    ? 0
-    : requireNonNegativeNumber(object["cache_creation_input_tokens"], modelId, "usage.cache_creation_input_tokens", requestId);
+  const inputTokens = requireNonNegativeNumber(
+    object["input_tokens"],
+    modelId,
+    "usage.input_tokens",
+    requestId,
+  );
+  const outputTokens = requireNonNegativeNumber(
+    object["output_tokens"],
+    modelId,
+    "usage.output_tokens",
+    requestId,
+  );
+  const cacheRead =
+    object["cache_read_input_tokens"] === undefined
+      ? 0
+      : requireNonNegativeNumber(
+          object["cache_read_input_tokens"],
+          modelId,
+          "usage.cache_read_input_tokens",
+          requestId,
+        );
+  const cacheCreation =
+    object["cache_creation_input_tokens"] === undefined
+      ? 0
+      : requireNonNegativeNumber(
+          object["cache_creation_input_tokens"],
+          modelId,
+          "usage.cache_creation_input_tokens",
+          requestId,
+        );
   const hasCacheRead = object["cache_read_input_tokens"] !== undefined;
   return {
     usage: hasCacheRead
@@ -455,10 +539,19 @@ const finishReason = (reason: unknown, hasTools: boolean): FinishReason => {
   return "other";
 };
 
-const parseMessage = (value: unknown, modelId: string, requestId?: string): ParsedMessage => {
+const parseMessage = (
+  value: unknown,
+  modelId: string,
+  requestId?: string,
+): ParsedMessage => {
   const message = requireRecord(value, modelId, "response", requestId);
   const id = requireString(message["id"], modelId, "id", requestId);
-  const responseModel = requireString(message["model"], modelId, "model", requestId);
+  const responseModel = requireString(
+    message["model"],
+    modelId,
+    "model",
+    requestId,
+  );
   if (!Array.isArray(message["content"]))
     throw responseError(modelId, "content must be an array", requestId);
   const text: string[] = [];
@@ -468,7 +561,12 @@ const parseMessage = (value: unknown, modelId: string, requestId?: string): Pars
   for (const rawBlock of message["content"]) {
     const block = requireRecord(rawBlock, modelId, "content block", requestId);
     if (block["type"] === "text") {
-      const valueText = requireString(block["text"], modelId, "text block text", requestId);
+      const valueText = requireString(
+        block["text"],
+        modelId,
+        "text block text",
+        requestId,
+      );
       text.push(valueText);
       content.push({ type: "text", text: valueText });
     } else if (block["type"] === "tool_use") {
@@ -482,11 +580,17 @@ const parseMessage = (value: unknown, modelId: string, requestId?: string): Pars
       toolCalls.push(toolCall);
       content.push({ type: "tool-call", ...toolCall });
     } else {
-      warnings.push({ type: "compatibility", message: "Anthropic returned an unsupported content block" });
+      warnings.push({
+        type: "compatibility",
+        message: "Anthropic returned an unsupported content block",
+      });
     }
   }
   const parsedUsage = parseUsage(message["usage"], modelId, requestId);
-  const stopSequence = typeof message["stop_sequence"] === "string" ? message["stop_sequence"] : null;
+  const stopSequence =
+    typeof message["stop_sequence"] === "string"
+      ? message["stop_sequence"]
+      : null;
   return {
     id,
     model: responseModel,
@@ -504,7 +608,8 @@ const retryAfterMs = (headers: Headers): number | undefined => {
   const raw = headers.get("retry-after");
   if (raw === null) return undefined;
   const seconds = Number(raw);
-  if (Number.isFinite(seconds) && seconds >= 0) return Math.round(seconds * 1000);
+  if (Number.isFinite(seconds) && seconds >= 0)
+    return Math.round(seconds * 1000);
   const date = Date.parse(raw);
   return Number.isFinite(date) ? Math.max(0, date - Date.now()) : undefined;
 };
@@ -521,11 +626,20 @@ const apiError = (response: Response, modelId: string): AgentSdkError => {
     retryAfterMs: retryAfterMs(response.headers),
   };
   if (response.status === 401 || response.status === 403)
-    return new AuthenticationError({ message: "Anthropic authentication failed", ...metadata });
+    return new AuthenticationError({
+      message: "Anthropic authentication failed",
+      ...metadata,
+    });
   if (response.status === 429)
-    return new RateLimitError({ message: "Anthropic rate limit exceeded", ...metadata });
+    return new RateLimitError({
+      message: "Anthropic rate limit exceeded",
+      ...metadata,
+    });
   if (response.status >= 400 && response.status < 500)
-    return new InvalidRequestError({ message: "Anthropic rejected the request", ...metadata });
+    return new InvalidRequestError({
+      message: "Anthropic rejected the request",
+      ...metadata,
+    });
   return new AgentSdkError({
     code: "MODEL_ERROR",
     message: "Anthropic service request failed",
@@ -534,7 +648,11 @@ const apiError = (response: Response, modelId: string): AgentSdkError => {
   });
 };
 
-const transportError = (cause: unknown, signal: AbortSignal | undefined, modelId: string): AgentSdkError => {
+const transportError = (
+  cause: unknown,
+  signal: AbortSignal | undefined,
+  modelId: string,
+): AgentSdkError => {
   if (signal?.aborted)
     return new AbortError({
       message: "Anthropic request was aborted",
@@ -543,14 +661,28 @@ const transportError = (cause: unknown, signal: AbortSignal | undefined, modelId
       modelId,
     });
   if (cause instanceof DOMException && cause.name === "AbortError")
-    return new AbortError({ message: "Anthropic request was aborted", cause, provider: PROVIDER, modelId });
+    return new AbortError({
+      message: "Anthropic request was aborted",
+      cause,
+      provider: PROVIDER,
+      modelId,
+    });
   if (AgentSdkError.isInstance(cause)) return cause;
-  return new NetworkError({ message: "Anthropic network request failed", cause, provider: PROVIDER, modelId });
+  return new NetworkError({
+    message: "Anthropic network request failed",
+    cause,
+    provider: PROVIDER,
+    modelId,
+  });
 };
 
-const requestHeaders = (config: ResolvedConfig, request: ModelRequest): Headers => {
+const requestHeaders = (
+  config: ResolvedConfig,
+  request: ModelRequest,
+): Headers => {
   const headers = new Headers(config.headers);
-  for (const [name, value] of Object.entries(request.headers ?? {})) headers.set(name, value);
+  for (const [name, value] of Object.entries(request.headers ?? {}))
+    headers.set(name, value);
   headers.set("content-type", "application/json");
   headers.set("x-api-key", config.apiKey);
   headers.set("anthropic-version", config.version);
@@ -563,7 +695,12 @@ const post = async (
   request: ModelRequest,
   body: Readonly<Record<string, unknown>>,
 ): Promise<Response> => {
-  if (request.abortSignal?.aborted) throw transportError(request.abortSignal.reason, request.abortSignal, modelId);
+  if (request.abortSignal?.aborted)
+    throw transportError(
+      request.abortSignal.reason,
+      request.abortSignal,
+      modelId,
+    );
   let serializedBody: string;
   try {
     serializedBody = JSON.stringify(body);
@@ -598,9 +735,16 @@ const post = async (
   return response;
 };
 
-const parseEventData = (data: string, modelId: string, requestId?: string): Record<string, unknown> => {
-  const value = parseUnknownJson(data, () => streamError(modelId, "event data is not valid JSON", requestId));
-  if (!isRecord(value)) throw streamError(modelId, "event data must be an object", requestId);
+const parseEventData = (
+  data: string,
+  modelId: string,
+  requestId?: string,
+): Record<string, unknown> => {
+  const value = parseUnknownJson(data, () =>
+    streamError(modelId, "event data is not valid JSON", requestId),
+  );
+  if (!isRecord(value))
+    throw streamError(modelId, "event data must be an object", requestId);
   return value;
 };
 
@@ -618,7 +762,11 @@ const streamCount = (
   requestId: string | undefined,
 ): number => {
   if (typeof value !== "number" || !Number.isFinite(value) || value < 0)
-    throw streamError(modelId, `${label} must be a non-negative number`, requestId);
+    throw streamError(
+      modelId,
+      `${label} must be a non-negative number`,
+      requestId,
+    );
   return value;
 };
 
@@ -628,7 +776,11 @@ const streamIndex = (
   requestId: string | undefined,
 ): number => {
   if (typeof value !== "number" || !Number.isInteger(value) || value < 0)
-    throw streamError(modelId, "content block index must be a non-negative integer", requestId);
+    throw streamError(
+      modelId,
+      "content block index must be a non-negative integer",
+      requestId,
+    );
   return value;
 };
 
@@ -638,14 +790,26 @@ const streamedApiError = (
   requestId: string | undefined,
 ): AgentSdkError => {
   const detail = event["error"];
-  const type = isRecord(detail) && typeof detail["type"] === "string" ? detail["type"] : undefined;
+  const type =
+    isRecord(detail) && typeof detail["type"] === "string"
+      ? detail["type"]
+      : undefined;
   const metadata = { provider: PROVIDER, modelId, requestId };
   if (type === "authentication_error" || type === "permission_error")
-    return new AuthenticationError({ message: "Anthropic authentication failed", ...metadata });
+    return new AuthenticationError({
+      message: "Anthropic authentication failed",
+      ...metadata,
+    });
   if (type === "rate_limit_error")
-    return new RateLimitError({ message: "Anthropic rate limit exceeded", ...metadata });
+    return new RateLimitError({
+      message: "Anthropic rate limit exceeded",
+      ...metadata,
+    });
   if (type === "invalid_request_error" || type === "not_found_error")
-    return new InvalidRequestError({ message: "Anthropic rejected the streaming request", ...metadata });
+    return new InvalidRequestError({
+      message: "Anthropic rejected the streaming request",
+      ...metadata,
+    });
   return new AgentSdkError({
     code: "MODEL_ERROR",
     message: "Anthropic reported a streaming error",
@@ -669,21 +833,48 @@ const processEvent = (
   if (type === "ping") return "none";
   if (type === "error") throw streamedApiError(event, modelId, requestId);
   if (type === "message_start") {
-    if (state.started) throw streamError(modelId, "received duplicate message_start", requestId);
+    if (state.started)
+      throw streamError(modelId, "received duplicate message_start", requestId);
     const message = event["message"];
-    if (!isRecord(message)) throw streamError(modelId, "message_start.message must be an object", requestId);
-    if (typeof message["id"] !== "string" || typeof message["model"] !== "string")
-      throw streamError(modelId, "message_start is missing id or model", requestId);
+    if (!isRecord(message))
+      throw streamError(
+        modelId,
+        "message_start.message must be an object",
+        requestId,
+      );
+    if (
+      typeof message["id"] !== "string" ||
+      typeof message["model"] !== "string"
+    )
+      throw streamError(
+        modelId,
+        "message_start is missing id or model",
+        requestId,
+      );
     state.responseId = message["id"];
     state.responseModel = message["model"];
     if (!isRecord(message["usage"]))
-      throw streamError(modelId, "message_start.usage must be an object", requestId);
+      throw streamError(
+        modelId,
+        "message_start.usage must be an object",
+        requestId,
+      );
     const usage = message["usage"];
-    state.inputTokens = streamCount(usage["input_tokens"], "usage.input_tokens", modelId, requestId);
+    state.inputTokens = streamCount(
+      usage["input_tokens"],
+      "usage.input_tokens",
+      modelId,
+      requestId,
+    );
     const read = usage["cache_read_input_tokens"];
     const creation = usage["cache_creation_input_tokens"];
     if (read !== undefined) {
-      state.cachedInputTokens = streamCount(read, "usage.cache_read_input_tokens", modelId, requestId);
+      state.cachedInputTokens = streamCount(
+        read,
+        "usage.cache_read_input_tokens",
+        modelId,
+        requestId,
+      );
       state.metadata["cacheReadInputTokens"] = state.cachedInputTokens;
     }
     if (creation !== undefined)
@@ -697,26 +888,55 @@ const processEvent = (
     return "none";
   }
   if (type === "content_block_start") {
-    if (!state.started) throw streamError(modelId, "content block arrived before message_start", requestId);
+    if (!state.started)
+      throw streamError(
+        modelId,
+        "content block arrived before message_start",
+        requestId,
+      );
     const index = streamIndex(event["index"], modelId, requestId);
     const block = event["content_block"];
-    if (!isRecord(block)) throw streamError(modelId, "invalid content_block_start", requestId);
+    if (!isRecord(block))
+      throw streamError(modelId, "invalid content_block_start", requestId);
     if (block["type"] === "tool_use") {
       if (typeof block["id"] !== "string" || typeof block["name"] !== "string")
-        throw streamError(modelId, "tool block is missing id or name", requestId);
+        throw streamError(
+          modelId,
+          "tool block is missing id or name",
+          requestId,
+        );
       if (block["input"] !== undefined && !isRecord(block["input"]))
         throw streamError(modelId, "tool input must be an object", requestId);
-      if (state.tools.has(index)) throw streamError(modelId, "received duplicate tool block index", requestId);
-      state.tools.set(index, { id: block["id"], name: block["name"], initialInput: block["input"], json: "" });
+      if (state.tools.has(index))
+        throw streamError(
+          modelId,
+          "received duplicate tool block index",
+          requestId,
+        );
+      state.tools.set(index, {
+        id: block["id"],
+        name: block["name"],
+        initialInput: block["input"],
+        json: "",
+      });
     } else if (block["type"] !== "text")
-      warnings.push({ type: "compatibility", message: "Anthropic streamed an unsupported content block" });
+      warnings.push({
+        type: "compatibility",
+        message: "Anthropic streamed an unsupported content block",
+      });
     return "none";
   }
   if (type === "content_block_delta") {
-    if (!state.started) throw streamError(modelId, "content delta arrived before message_start", requestId);
+    if (!state.started)
+      throw streamError(
+        modelId,
+        "content delta arrived before message_start",
+        requestId,
+      );
     const index = streamIndex(event["index"], modelId, requestId);
     const delta = event["delta"];
-    if (!isRecord(delta)) throw streamError(modelId, "invalid content_block_delta", requestId);
+    if (!isRecord(delta))
+      throw streamError(modelId, "invalid content_block_delta", requestId);
     if (delta["type"] === "text_delta") {
       if (typeof delta["text"] !== "string")
         throw streamError(modelId, "text delta is missing text", requestId);
@@ -736,10 +956,14 @@ const processEvent = (
     const index = streamIndex(event["index"], modelId, requestId);
     const tool = state.tools.get(index);
     if (tool) {
-      const input = tool.json.length === 0
-        ? tool.initialInput
-        : parseUnknownJson(tool.json, () => streamError(modelId, "tool input is not valid JSON", requestId));
-      if (!isRecord(input)) throw streamError(modelId, "tool input must be an object", requestId);
+      const input =
+        tool.json.length === 0
+          ? tool.initialInput
+          : parseUnknownJson(tool.json, () =>
+              streamError(modelId, "tool input is not valid JSON", requestId),
+            );
+      if (!isRecord(input))
+        throw streamError(modelId, "tool input must be an object", requestId);
       controller.enqueue({
         type: "tool-call",
         toolCall: { toolCallId: tool.id, toolName: tool.name, input },
@@ -750,14 +974,32 @@ const processEvent = (
     return "none";
   }
   if (type === "message_delta") {
-    if (!state.started) throw streamError(modelId, "message_delta arrived before message_start", requestId);
+    if (!state.started)
+      throw streamError(
+        modelId,
+        "message_delta arrived before message_start",
+        requestId,
+      );
     const delta = event["delta"];
-    if (!isRecord(delta)) throw streamError(modelId, "message_delta.delta must be an object", requestId);
-    if (typeof delta["stop_reason"] === "string" || delta["stop_reason"] === null)
+    if (!isRecord(delta))
+      throw streamError(
+        modelId,
+        "message_delta.delta must be an object",
+        requestId,
+      );
+    if (
+      typeof delta["stop_reason"] === "string" ||
+      delta["stop_reason"] === null
+    )
       state.stopReason = delta["stop_reason"];
-    if (typeof delta["stop_sequence"] === "string") state.metadata["stopSequence"] = delta["stop_sequence"];
+    if (typeof delta["stop_sequence"] === "string")
+      state.metadata["stopSequence"] = delta["stop_sequence"];
     if (!isRecord(event["usage"]))
-      throw streamError(modelId, "message_delta.usage must be an object", requestId);
+      throw streamError(
+        modelId,
+        "message_delta.usage must be an object",
+        requestId,
+      );
     state.outputTokens = streamCount(
       event["usage"]["output_tokens"],
       "usage.output_tokens",
@@ -767,9 +1009,18 @@ const processEvent = (
     return "none";
   }
   if (type === "message_stop") {
-    if (!state.started) throw streamError(modelId, "message_stop arrived before message_start", requestId);
+    if (!state.started)
+      throw streamError(
+        modelId,
+        "message_stop arrived before message_start",
+        requestId,
+      );
     if (state.tools.size > 0)
-      throw streamError(modelId, "stream ended before a tool input completed", requestId);
+      throw streamError(
+        modelId,
+        "stream ended before a tool input completed",
+        requestId,
+      );
     controller.enqueue({
       type: "finish",
       finishReason: finishReason(state.stopReason, false),
@@ -832,107 +1083,118 @@ const createEventStream = (
     return cleanupPromise;
   };
 
-  return new ReadableStream<ModelStreamPart>({
-    async pull(controller) {
-      const dispatch = (): EventResult => {
-        if (dataLines.length === 0) {
-          eventName = undefined;
-          return "none";
-        }
-        const result = processEvent(
-          eventName,
-          dataLines.join("\n"),
-          state,
-          controller,
-          modelId,
-          requestId,
-          streamWarnings,
-        );
-        eventName = undefined;
-        dataLines = [];
-        return result;
-      };
-      const consumeLine = (line: string): EventResult => {
-        if (line === "") return dispatch();
-        if (line.startsWith("event:")) eventName = line.slice(6).trimStart();
-        else if (line.startsWith("data:")) {
-          const value = line.slice(5);
-          dataLines.push(value.startsWith(" ") ? value.slice(1) : value);
-        }
-        return "none";
-      };
-      const processBufferedLines = (): EventResult => {
-        let newline = buffer.indexOf("\n");
-        while (newline >= 0) {
-          let line = buffer.slice(0, newline);
-          if (line.endsWith("\r")) line = line.slice(0, -1);
-          buffer = buffer.slice(newline + 1);
-          const result = consumeLine(line);
-          if (result !== "none") return result;
-          newline = buffer.indexOf("\n");
-        }
-        return "none";
-      };
-      try {
-        while (!cancelled && !terminal) {
-          const bufferedResult = processBufferedLines();
-          if (bufferedResult === "emitted") return;
-          if (bufferedResult === "finished") {
-            terminal = true;
-            controller.close();
-            await cleanup(true);
-            return;
+  return new ReadableStream<ModelStreamPart>(
+    {
+      async pull(controller) {
+        const dispatch = (): EventResult => {
+          if (dataLines.length === 0) {
+            eventName = undefined;
+            return "none";
           }
+          const result = processEvent(
+            eventName,
+            dataLines.join("\n"),
+            state,
+            controller,
+            modelId,
+            requestId,
+            streamWarnings,
+          );
+          eventName = undefined;
+          dataLines = [];
+          return result;
+        };
+        const consumeLine = (line: string): EventResult => {
+          if (line === "") return dispatch();
+          if (line.startsWith("event:")) eventName = line.slice(6).trimStart();
+          else if (line.startsWith("data:")) {
+            const value = line.slice(5);
+            dataLines.push(value.startsWith(" ") ? value.slice(1) : value);
+          }
+          return "none";
+        };
+        const processBufferedLines = (): EventResult => {
+          let newline = buffer.indexOf("\n");
+          while (newline >= 0) {
+            let line = buffer.slice(0, newline);
+            if (line.endsWith("\r")) line = line.slice(0, -1);
+            buffer = buffer.slice(newline + 1);
+            const result = consumeLine(line);
+            if (result !== "none") return result;
+            newline = buffer.indexOf("\n");
+          }
+          return "none";
+        };
+        try {
+          while (!cancelled && !terminal) {
+            const bufferedResult = processBufferedLines();
+            if (bufferedResult === "emitted") return;
+            if (bufferedResult === "finished") {
+              terminal = true;
+              controller.close();
+              await cleanup(true);
+              return;
+            }
 
-          if (inputEnded) {
-            if (!inputFinalized) {
-              inputFinalized = true;
-              if (buffer.length > 0) {
-                const finalLine = buffer.endsWith("\r") ? buffer.slice(0, -1) : buffer;
-                buffer = "";
-                const lineResult = consumeLine(finalLine);
-                if (lineResult === "emitted") return;
-                if (lineResult === "finished") {
+            if (inputEnded) {
+              if (!inputFinalized) {
+                inputFinalized = true;
+                if (buffer.length > 0) {
+                  const finalLine = buffer.endsWith("\r")
+                    ? buffer.slice(0, -1)
+                    : buffer;
+                  buffer = "";
+                  const lineResult = consumeLine(finalLine);
+                  if (lineResult === "emitted") return;
+                  if (lineResult === "finished") {
+                    terminal = true;
+                    controller.close();
+                    await cleanup(false);
+                    return;
+                  }
+                }
+                const finalResult = dispatch();
+                if (finalResult === "emitted") return;
+                if (finalResult === "finished") {
                   terminal = true;
                   controller.close();
                   await cleanup(false);
                   return;
                 }
               }
-              const finalResult = dispatch();
-              if (finalResult === "emitted") return;
-              if (finalResult === "finished") {
-                terminal = true;
-                controller.close();
-                await cleanup(false);
-                return;
-              }
+              throw streamError(
+                modelId,
+                "stream ended without message_stop",
+                requestId,
+              );
             }
-            throw streamError(modelId, "stream ended without message_stop", requestId);
-          }
 
-          const chunk = await reader.read();
-          if (chunk.done) {
-            inputEnded = true;
-            buffer += decoder.decode();
-          } else {
-            buffer += decoder.decode(chunk.value, { stream: true });
+            const chunk = await reader.read();
+            if (chunk.done) {
+              inputEnded = true;
+              buffer += decoder.decode();
+            } else {
+              buffer += decoder.decode(chunk.value, { stream: true });
+            }
+          }
+        } catch (cause) {
+          if (!cancelled && !terminal) {
+            terminal = true;
+            await cleanup(true, cause);
+            controller.error(
+              transportError(cause, request.abortSignal, modelId),
+            );
           }
         }
-      } catch (cause) {
-        if (!cancelled && !terminal) {
-          terminal = true;
-          await cleanup(true, cause);
-          controller.error(transportError(cause, request.abortSignal, modelId));
-        }
-      }
+      },
+      async cancel(reason) {
+        cancelled = true;
+        terminal = true;
+        await cleanup(true, reason);
+      },
     },
-    async cancel(reason) {
-      cancelled = true;
-      terminal = true;
-      await cleanup(true, reason);
-    },
-  }, { highWaterMark: 0 });
+    { highWaterMark: 0 },
+  );
 };
 
 class AnthropicLanguageModel implements LanguageModel {
@@ -953,7 +1215,12 @@ class AnthropicLanguageModel implements LanguageModel {
       false,
       this.settings,
     );
-    const response = await post(this.config, this.modelId, request, prepared.body);
+    const response = await post(
+      this.config,
+      this.modelId,
+      request,
+      prepared.body,
+    );
     const requestId = requestIdFrom(response.headers);
     let value: unknown;
     try {
@@ -981,7 +1248,9 @@ class AnthropicLanguageModel implements LanguageModel {
     };
   }
 
-  async stream(request: ModelRequest): Promise<ReadableStream<ModelStreamPart>> {
+  async stream(
+    request: ModelRequest,
+  ): Promise<ReadableStream<ModelStreamPart>> {
     const prepared = prepareRequest(
       request,
       this.modelId,
@@ -989,23 +1258,43 @@ class AnthropicLanguageModel implements LanguageModel {
       true,
       this.settings,
     );
-    const response = await post(this.config, this.modelId, request, prepared.body);
-    return createEventStream(response, request, this.modelId, prepared.warnings);
+    const response = await post(
+      this.config,
+      this.modelId,
+      request,
+      prepared.body,
+    );
+    return createEventStream(
+      response,
+      request,
+      this.modelId,
+      prepared.warnings,
+    );
   }
 }
 
 const resolveConfig = (config: AnthropicConfig): ResolvedConfig => {
-  if (!config || typeof config.apiKey !== "string" || config.apiKey.trim().length === 0)
+  if (
+    !config ||
+    typeof config.apiKey !== "string" ||
+    config.apiKey.trim().length === 0
+  )
     throw new InvalidRequestError({
       message: "Anthropic apiKey is required",
       provider: PROVIDER,
     });
   const baseURL = (config.baseURL ?? DEFAULT_BASE_URL).replace(/\/+$/, "");
   if (baseURL.length === 0)
-    throw new InvalidRequestError({ message: "Anthropic baseURL must not be empty", provider: PROVIDER });
+    throw new InvalidRequestError({
+      message: "Anthropic baseURL must not be empty",
+      provider: PROVIDER,
+    });
   const version = config.version ?? DEFAULT_VERSION;
   if (version.trim().length === 0)
-    throw new InvalidRequestError({ message: "Anthropic version must not be empty", provider: PROVIDER });
+    throw new InvalidRequestError({
+      message: "Anthropic version must not be empty",
+      provider: PROVIDER,
+    });
   const defaultMaxTokens = config.defaultMaxTokens ?? DEFAULT_MAX_TOKENS;
   if (!Number.isInteger(defaultMaxTokens) || defaultMaxTokens <= 0)
     throw new InvalidRequestError({
@@ -1031,7 +1320,10 @@ export const createAnthropic = (config: AnthropicConfig): AnthropicProvider => {
       settings?: AnthropicModelSettings,
     ): LanguageModel {
       if (modelId.trim().length === 0)
-        throw new InvalidRequestError({ message: "Anthropic modelId must not be empty", provider: PROVIDER });
+        throw new InvalidRequestError({
+          message: "Anthropic modelId must not be empty",
+          provider: PROVIDER,
+        });
       return new AnthropicLanguageModel(modelId, resolved, settings);
     },
   };

@@ -218,7 +218,8 @@ export const addUsage = (left: Usage, right: Usage): Usage => ({
   outputTokens: left.outputTokens + right.outputTokens,
   totalTokens: left.totalTokens + right.totalTokens,
   cachedInputTokens:
-    left.cachedInputTokens === undefined && right.cachedInputTokens === undefined
+    left.cachedInputTokens === undefined &&
+    right.cachedInputTokens === undefined
       ? undefined
       : (left.cachedInputTokens ?? 0) + (right.cachedInputTokens ?? 0),
   reasoningTokens:
