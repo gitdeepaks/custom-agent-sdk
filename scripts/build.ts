@@ -3,9 +3,14 @@ import { $ } from "bun";
 await $`rm -rf dist`;
 
 const build = await Bun.build({
-  entrypoints: ["./src/index.ts"],
+  entrypoints: [
+    "./src/index.ts",
+    "./src/providers/openai/index.ts",
+    "./src/providers/anthropic/index.ts",
+  ],
   outdir: "./dist",
   target: "node",
+  naming: "[dir]/[name].[ext]",
 });
 
 if (!build.success) {

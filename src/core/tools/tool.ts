@@ -78,7 +78,10 @@ export const toModelTools = (
       }))
     : [];
 
-export const getTool = (tools: ToolSet | undefined, name: string): AnyTool | undefined => {
+export const getTool = (
+  tools: ToolSet | undefined,
+  name: string,
+): AnyTool | undefined => {
   if (!tools || !Object.hasOwn(tools, name)) return undefined;
   return tools[name];
 };

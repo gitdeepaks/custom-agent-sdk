@@ -4,7 +4,7 @@ A provider-neutral, type-safe agent SDK for TypeScript, designed around the ergo
 
 ## Status
 
-This repository is the production-oriented core foundation. It includes text generation, native streaming, runtime-validated tools, bounded tool loops, retries, cancellation, stable errors, usage aggregation, and a reusable `Agent` API. Provider adapters, structured output, middleware, telemetry, persistence, and UI framework packages should be versioned independently as the project grows.
+This repository includes a provider-neutral core plus first-party OpenAI Responses API and Anthropic Messages API adapters. It supports text generation, multipart messages, native streaming, runtime-validated tools, bounded tool loops, retries, cancellation, normalized provider errors and usage, and a reusable `Agent` API.
 
 ## Requirements
 
@@ -35,28 +35,31 @@ OPENAI_API_KEY=sk-...
 ANTHROPIC_API_KEY=sk-ant-...
 ```
 
-| Variable | Required | Purpose |
-| --- | --- | --- |
-| `OPENAI_API_KEY` | For OpenAI only | Authenticates requests made by an OpenAI provider adapter. |
-| `ANTHROPIC_API_KEY` | For Anthropic only | Authenticates requests made by an Anthropic provider adapter. |
-| `OPENAI_BASE_URL` | No | Overrides the OpenAI endpoint when supported by the adapter. |
-| `ANTHROPIC_BASE_URL` | No | Overrides the Anthropic endpoint when supported by the adapter. |
+| Variable             | Required           | Purpose                                                         |
+| -------------------- | ------------------ | --------------------------------------------------------------- |
+| `OPENAI_API_KEY`     | For OpenAI only    | Authenticates requests made by an OpenAI provider adapter.      |
+| `ANTHROPIC_API_KEY`  | For Anthropic only | Authenticates requests made by an Anthropic provider adapter.   |
+| `OPENAI_BASE_URL`    | No                 | Overrides the OpenAI endpoint when supported by the adapter.    |
+| `ANTHROPIC_BASE_URL` | No                 | Overrides the Anthropic endpoint when supported by the adapter. |
 
 The core `@open-agent/sdk` package does not read these variables. Credentials belong to the application or provider package that constructs the `LanguageModel`. Do not use `OPENAI_API_KEY || ANTHROPIC_API_KEY`; select a provider explicitly and validate its corresponding key. Never commit `.env` or real credentials. The repository ignores `.env` while retaining `.env.example` as documentation.
 
 ## Quick Start
 
-Providers implement the small `LanguageModel` interface:
+Create a provider explicitly and pass its protocol-v1 model to the core:
 
 ```ts
 import {
   Agent,
   defineSchema,
   tool,
-  type LanguageModel,
 } from "@open-agent/sdk";
+import { createOpenAI } from "@open-agent/sdk/openai";
 
-declare const model: LanguageModel;
+const apiKey = Bun.env.OPENAI_API_KEY;
+if (!apiKey) throw new Error("OPENAI_API_KEY is required");
+
+const model = createOpenAI({ apiKey }).languageModel("your-model-id");
 
 const weather = tool({
   name: "weather",
@@ -174,30 +177,41 @@ bun run build
 
 ## Provider Contract
 
-Implement `LanguageModel.generate` and optionally `LanguageModel.stream`. The core owns orchestration; adapters own authentication, wire-format validation, provider error normalization, and SSE decoding. Keeping that boundary narrow prevents vendor types and credentials from leaking into agents.
+`LanguageModel` uses the versioned `v1` provider protocol. The core owns orchestration and runtime boundary validation; adapters own authentication, wire-format validation, provider error normalization, and SSE decoding. Keeping that boundary narrow prevents vendor types and credentials from leaking into agents.
 
-Provider packages implement `Provider` and create models through `languageModel(modelId)`. Each provider owns its API key, endpoint, request validation, and environment-variable policy. The core intentionally never reads `OPENAI_API_KEY` or `ANTHROPIC_API_KEY`.
+Provider adapters implement `Provider` and create models through `languageModel(modelId, settings?)`. Each provider owns its API key, endpoint, request validation, and typed model settings. The core intentionally never reads `OPENAI_API_KEY` or `ANTHROPIC_API_KEY`.
+
+```ts
+import { createAnthropic } from "@open-agent/sdk/anthropic";
+
+const apiKey = Bun.env.ANTHROPIC_API_KEY;
+if (!apiKey) throw new Error("ANTHROPIC_API_KEY is required");
+
+const model = createAnthropic({ apiKey }).languageModel("your-model-id");
+```
 
 ## Project Structure
 
 ```text
 src/
 ├── index.ts                    # Stable public package entry point
-└── core/
-    ├── index.ts                # Core export boundary
-    ├── agent/agent.ts          # Reusable Agent facade
-    ├── errors/errors.ts        # Stable SDK and tool errors
-    ├── generation/
-    │   ├── generate-text.ts    # Generation and tool loop
-    │   └── stream-text.ts      # Provider-native streaming
-    ├── model/types.ts          # Provider protocol and messages
-    ├── provider/provider.ts    # Provider factory contract
-    └── tools/tool.ts           # Schemas and typed tools
+├── core/
+│   ├── index.ts                # Core export boundary
+│   ├── agent/agent.ts          # Reusable Agent facade
+│   ├── errors/errors.ts        # Stable SDK and tool errors
+│   ├── generation/
+│   │   ├── generate-text.ts    # Generation and tool loop
+│   │   └── stream-text.ts      # Provider-native streaming
+│   ├── model/types.ts          # Provider protocol and messages
+│   ├── provider/provider.ts    # Provider factory contract
+│   └── tools/tool.ts           # Schemas and typed tools
+└── providers/
+    ├── openai/                 # OpenAI Responses API adapter
+    └── anthropic/              # Anthropic Messages API adapter
 test/
-└── sdk.test.ts                 # Public behavior tests
+├── provider-contract.ts        # Shared adapter contract suite
+└── phase2-providers.test.ts    # Provider wire fixtures
 ```
-
-Future OpenAI and Anthropic adapters should be separate packages, such as `@open-agent/openai` and `@open-agent/anthropic`, rather than importing credentials into `@open-agent/sdk`.
 
 ## License
 

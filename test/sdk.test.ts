@@ -21,12 +21,14 @@ const response = (options: Partial<ModelResponse> = {}): ModelResponse => {
   return {
     text: options.text ?? "hello",
     toolCalls,
-    finishReason: options.finishReason ?? (toolCalls.length > 0 ? "tool-calls" : "stop"),
+    finishReason:
+      options.finishReason ?? (toolCalls.length > 0 ? "tool-calls" : "stop"),
     usage: options.usage ?? usage,
   };
 };
 
 class SequenceModel implements LanguageModel {
+  readonly specificationVersion = "v1";
   readonly provider = "test";
   readonly modelId = "sequence";
   readonly requests: ModelRequest[] = [];
@@ -50,7 +52,9 @@ describe("generateText", () => {
 
     expect(result.text).toBe("hello");
     expect(result.usage).toEqual(usage);
-    expect(model.requests[0]?.messages).toEqual([{ role: "user", content: "Hi" }]);
+    expect(model.requests[0]?.messages).toEqual([
+      { role: "user", content: "Hi" },
+    ]);
   });
 
   test("validates typed tool input and continues the loop", async () => {
@@ -61,7 +65,8 @@ describe("generateText", () => {
       inputSchema: defineSchema({
         jsonSchema: { type: "number" },
         parse(value) {
-          if (typeof value !== "number" || !Number.isFinite(value)) throw new Error("Expected a finite number");
+          if (typeof value !== "number" || !Number.isFinite(value))
+            throw new Error("Expected a finite number");
           return value;
         },
       }),
@@ -79,7 +84,12 @@ describe("generateText", () => {
       response({ text: "42" }),
     ]);
 
-    const result = await generateText({ model, prompt: "Double 21", tools: { double }, maxSteps: 2 });
+    const result = await generateText({
+      model,
+      prompt: "Double 21",
+      tools: { double },
+      maxSteps: 2,
+    });
 
     expect(result.text).toBe("42");
     expect(seenInputs).toEqual([21]);
@@ -110,10 +120,14 @@ describe("generateText", () => {
       },
     });
     const model = new SequenceModel([
-      response({ toolCalls: [{ toolCallId: "bad", toolName: "strict", input: "no" }] }),
+      response({
+        toolCalls: [{ toolCallId: "bad", toolName: "strict", input: "no" }],
+      }),
     ]);
 
-    await expect(generateText({ model, prompt: "run", tools: { strict }, maxSteps: 2 })).rejects.toMatchObject({
+    await expect(
+      generateText({ model, prompt: "run", tools: { strict }, maxSteps: 2 }),
+    ).rejects.toMatchObject({
       code: "TOOL_INPUT_INVALID",
       toolName: "strict",
     });
@@ -122,16 +136,25 @@ describe("generateText", () => {
 
   test("uses stable errors for unknown tools and invalid limits", async () => {
     const model = new SequenceModel([
-      response({ toolCalls: [{ toolCallId: "missing", toolName: "unknown", input: null }] }),
+      response({
+        toolCalls: [
+          { toolCallId: "missing", toolName: "unknown", input: null },
+        ],
+      }),
     ]);
 
-    await expect(generateText({ model, prompt: "run", maxSteps: 2 })).rejects.toBeInstanceOf(ToolError);
-    await expect(generateText({ model, prompt: "run", maxSteps: 0 })).rejects.toBeInstanceOf(AgentSdkError);
+    await expect(
+      generateText({ model, prompt: "run", maxSteps: 2 }),
+    ).rejects.toBeInstanceOf(ToolError);
+    await expect(
+      generateText({ model, prompt: "run", maxSteps: 0 }),
+    ).rejects.toBeInstanceOf(AgentSdkError);
   });
 
   test("retries transient model failures", async () => {
     let attempts = 0;
     const model: LanguageModel = {
+      specificationVersion: "v1",
       provider: "test",
       modelId: "retry",
       async generate() {
@@ -155,6 +178,7 @@ describe("streamText", () => {
       { type: "finish", finishReason: "stop", usage },
     ];
     const model: LanguageModel = {
+      specificationVersion: "v1",
       provider: "test",
       modelId: "stream",
       generate: async () => response(),
@@ -183,7 +207,10 @@ test("Agent applies reusable settings", async () => {
   const result = await agent.run({ prompt: "Hi" });
 
   expect(result.text).toBe("agent response");
-  expect(model.requests[0]?.messages[0]).toEqual({ role: "system", content: "Be concise" });
+  expect(model.requests[0]?.messages[0]).toEqual({
+    role: "system",
+    content: "Be concise",
+  });
 });
 
 describe("Agent.builder", () => {
@@ -192,13 +219,19 @@ describe("Agent.builder", () => {
     const first = tool({
       name: "first",
       description: "First tool",
-      inputSchema: defineSchema({ jsonSchema: { type: "null" }, parse: () => null }),
+      inputSchema: defineSchema({
+        jsonSchema: { type: "null" },
+        parse: () => null,
+      }),
       execute: () => "first",
     });
     const second = tool({
       name: "second",
       description: "Second tool",
-      inputSchema: defineSchema({ jsonSchema: { type: "null" }, parse: () => null }),
+      inputSchema: defineSchema({
+        jsonSchema: { type: "null" },
+        parse: () => null,
+      }),
       execute: () => "second",
     });
 
@@ -214,10 +247,15 @@ describe("Agent.builder", () => {
       role: "system",
       content: "You are an expert coding agent",
     });
-    expect(model.requests[0]?.tools.map(({ name }) => name)).toEqual(["first", "second"]);
+    expect(model.requests[0]?.tools.map(({ name }) => name)).toEqual([
+      "first",
+      "second",
+    ]);
   });
 
   test("requires a language model", () => {
-    expect(() => Agent.builder().build()).toThrow("Agent builder requires a language model");
+    expect(() => Agent.builder().build()).toThrow(
+      "Agent builder requires a language model",
+    );
   });
 });

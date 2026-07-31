@@ -1,6 +1,6 @@
 {
   "name": "@open-agent/sdk",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Provider-neutral, type-safe agent SDK for TypeScript",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -8,6 +8,14 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./openai": {
+      "types": "./dist/providers/openai/index.d.ts",
+      "import": "./dist/providers/openai/index.js"
+    },
+    "./anthropic": {
+      "types": "./dist/providers/anthropic/index.d.ts",
+      "import": "./dist/providers/anthropic/index.js"
     }
   },
   "type": "module",
@@ -19,6 +27,7 @@
   "scripts": {
     "build": "bun ./scripts/build.ts",
     "test": "bun test",
+    "test:live": "bun ./scripts/live-provider-smoke.ts",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {

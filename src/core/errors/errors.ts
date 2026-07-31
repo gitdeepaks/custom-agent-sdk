@@ -1,4 +1,8 @@
 export type AgentSdkErrorCode =
+  | "AUTHENTICATION_ERROR"
+  | "RATE_LIMIT_ERROR"
+  | "INVALID_REQUEST"
+  | "UNSUPPORTED_FEATURE"
   | "MODEL_ERROR"
   | "MODEL_RESPONSE_INVALID"
   | "STREAM_PROTOCOL_ERROR"
@@ -49,11 +53,13 @@ export class AgentSdkError extends Error {
   readonly retryAfterMs?: number | undefined;
   partialResult?: unknown;
 
-  constructor(options: ErrorMetadata & {
-    readonly code: AgentSdkErrorCode;
-    readonly message: string;
-    readonly cause?: unknown;
-  }) {
+  constructor(
+    options: ErrorMetadata & {
+      readonly code: AgentSdkErrorCode;
+      readonly message: string;
+      readonly cause?: unknown;
+    },
+  ) {
     super(options.message);
     this.name = "AgentSdkError";
     this.code = options.code;
@@ -98,8 +104,17 @@ export class AgentSdkError extends Error {
 }
 
 export class AbortError extends AgentSdkError {
-  constructor(options: ErrorMetadata & { readonly message?: string; readonly cause?: unknown } = {}) {
-    super({ code: "ABORTED", message: options.message ?? "Operation was aborted", ...options });
+  constructor(
+    options: ErrorMetadata & {
+      readonly message?: string;
+      readonly cause?: unknown;
+    } = {},
+  ) {
+    super({
+      code: "ABORTED",
+      message: options.message ?? "Operation was aborted",
+      ...options,
+    });
     this.name = "AbortError";
   }
 }
@@ -108,15 +123,19 @@ export class TimeoutError extends AgentSdkError {
   readonly timeoutKind: TimeoutKind;
   readonly timeoutMs: number;
 
-  constructor(options: ErrorMetadata & {
-    readonly timeoutKind: TimeoutKind;
-    readonly timeoutMs: number;
-    readonly message?: string;
-    readonly cause?: unknown;
-  }) {
+  constructor(
+    options: ErrorMetadata & {
+      readonly timeoutKind: TimeoutKind;
+      readonly timeoutMs: number;
+      readonly message?: string;
+      readonly cause?: unknown;
+    },
+  ) {
     super({
       code: "TIMEOUT",
-      message: options.message ?? `${options.timeoutKind} timed out after ${options.timeoutMs}ms`,
+      message:
+        options.message ??
+        `${options.timeoutKind} timed out after ${options.timeoutMs}ms`,
       retryable: options.timeoutKind !== "tool",
       ...options,
     });
@@ -127,21 +146,90 @@ export class TimeoutError extends AgentSdkError {
 }
 
 export class NetworkError extends AgentSdkError {
-  constructor(options: ErrorMetadata & { readonly message?: string; readonly cause?: unknown } = {}) {
-    super({ code: "NETWORK_ERROR", message: options.message ?? "A network request failed", retryable: true, ...options });
+  constructor(
+    options: ErrorMetadata & {
+      readonly message?: string;
+      readonly cause?: unknown;
+    } = {},
+  ) {
+    super({
+      code: "NETWORK_ERROR",
+      message: options.message ?? "A network request failed",
+      retryable: true,
+      ...options,
+    });
     this.name = "NetworkError";
   }
 }
 
+export class AuthenticationError extends AgentSdkError {
+  constructor(
+    options: ErrorMetadata & { readonly message?: string; readonly cause?: unknown } = {},
+  ) {
+    super({
+      code: "AUTHENTICATION_ERROR",
+      message: options.message ?? "Model provider authentication failed",
+      ...options,
+    });
+    this.name = "AuthenticationError";
+  }
+}
+
+export class RateLimitError extends AgentSdkError {
+  constructor(
+    options: ErrorMetadata & { readonly message?: string; readonly cause?: unknown } = {},
+  ) {
+    super({
+      code: "RATE_LIMIT_ERROR",
+      message: options.message ?? "The model provider rate limit was exceeded",
+      retryable: true,
+      ...options,
+    });
+    this.name = "RateLimitError";
+  }
+}
+
+export class InvalidRequestError extends AgentSdkError {
+  constructor(
+    options: ErrorMetadata & { readonly message?: string; readonly cause?: unknown } = {},
+  ) {
+    super({
+      code: "INVALID_REQUEST",
+      message: options.message ?? "The model provider rejected the request",
+      ...options,
+    });
+    this.name = "InvalidRequestError";
+  }
+}
+
+export class UnsupportedFeatureError extends AgentSdkError {
+  constructor(
+    options: ErrorMetadata & { readonly message: string; readonly cause?: unknown },
+  ) {
+    super({ code: "UNSUPPORTED_FEATURE", ...options });
+    this.name = "UnsupportedFeatureError";
+  }
+}
+
 export class ModelResponseError extends AgentSdkError {
-  constructor(options: ErrorMetadata & { readonly message: string; readonly cause?: unknown }) {
+  constructor(
+    options: ErrorMetadata & {
+      readonly message: string;
+      readonly cause?: unknown;
+    },
+  ) {
     super({ code: "MODEL_RESPONSE_INVALID", ...options });
     this.name = "ModelResponseError";
   }
 }
 
 export class StreamProtocolError extends AgentSdkError {
-  constructor(options: ErrorMetadata & { readonly message: string; readonly cause?: unknown }) {
+  constructor(
+    options: ErrorMetadata & {
+      readonly message: string;
+      readonly cause?: unknown;
+    },
+  ) {
     super({ code: "STREAM_PROTOCOL_ERROR", ...options });
     this.name = "StreamProtocolError";
   }
@@ -151,13 +239,18 @@ export class ToolError extends AgentSdkError {
   readonly toolName: string;
   readonly toolCallId: string;
 
-  constructor(options: ErrorMetadata & {
-    readonly code: "TOOL_NOT_FOUND" | "TOOL_INPUT_INVALID" | "TOOL_EXECUTION_FAILED";
-    readonly message: string;
-    readonly toolName: string;
-    readonly toolCallId: string;
-    readonly cause?: unknown;
-  }) {
+  constructor(
+    options: ErrorMetadata & {
+      readonly code:
+        | "TOOL_NOT_FOUND"
+        | "TOOL_INPUT_INVALID"
+        | "TOOL_EXECUTION_FAILED";
+      readonly message: string;
+      readonly toolName: string;
+      readonly toolCallId: string;
+      readonly cause?: unknown;
+    },
+  ) {
     super(options);
     this.name = "ToolError";
     this.toolName = options.toolName;
@@ -168,7 +261,10 @@ export class ToolError extends AgentSdkError {
 export const getErrorMessage = (error: unknown): string =>
   error instanceof Error ? error.message : "Unknown error";
 
-export const toAbortError = (signal: AbortSignal, message?: string): AgentSdkError => {
+export const toAbortError = (
+  signal: AbortSignal,
+  message?: string,
+): AgentSdkError => {
   if (AgentSdkError.isInstance(signal.reason)) return signal.reason;
   return message === undefined
     ? new AbortError({ cause: signal.reason })
