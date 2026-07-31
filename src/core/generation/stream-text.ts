@@ -8,14 +8,20 @@ import {
   callModel,
   createMessages,
   createModelRequest,
-  executeTool,
+  executeTools,
   retryDelay,
   sleep,
   type GenerateTextOptions,
   type GenerateTextResult,
   type StepResult,
 } from "./generate-text";
-import { getTool, type ToolSet } from "../tools/tool";
+import {
+  getTool,
+  normalizeToolRegistry,
+  type AnyTool,
+  type ToolSet,
+} from "../tools/tool";
+import { invokeLifecycle, type Cost } from "./orchestration";
 import {
   addUsage,
   zeroUsage,
@@ -25,6 +31,7 @@ import {
   type ProviderMetadata,
   type ProviderWarning,
   type ToolCall,
+  type ToolMessage,
   type Usage,
 } from "../model/types";
 import {
@@ -34,6 +41,7 @@ import {
   normalizeModelError,
   raceWithSignal,
   validateModelStreamPart,
+  validateMessages,
   validateOptions,
   type OperationSignal,
 } from "./runtime";
@@ -302,12 +310,89 @@ async function* runStream<Tools extends ToolSet>(
   let totalUsage = zeroUsage();
   let latestText = "";
   const warnings: ProviderWarning[] = [];
+  const normalizedTools = normalizeToolRegistry(options.tools);
+  const runId = options.runId ?? crypto.randomUUID();
+  let cost: Cost | undefined;
+  const retry = options.callbacks?.onRetry
+    ? {
+        ...options.retry,
+        async onRetry(
+          event: import("./generate-text").RetryEvent,
+        ): Promise<void> {
+          await options.retry?.onRetry?.(event);
+          await invokeLifecycle(options.callbacks?.onRetry, "onRetry", event);
+        },
+      }
+    : options.retry;
 
   try {
+    if (options.callbacks?.onStart)
+      await invokeLifecycle(options.callbacks.onStart, "onStart", {
+        runId,
+        context: options.context,
+      });
     for (let index = 0; index < maxSteps; index += 1) {
       if (runSignal.aborted)
         throw toAbortError(runSignal, "Generation stream was aborted");
       const stepNumber = index + 1;
+      const stepContext = {
+        runId,
+        context: options.context,
+        stepNumber,
+        messages: [...messages],
+        steps: [...steps],
+        usage: totalUsage,
+      };
+      if (options.callbacks?.onStepStart)
+        await invokeLifecycle(
+          options.callbacks.onStepStart,
+          "onStepStart",
+          stepContext,
+        );
+      const prepared = options.prepareStep
+        ? await options.prepareStep(stepContext)
+        : undefined;
+      const requestMessages =
+        (options.contextManager?.prepareMessages
+          ? await options.contextManager.prepareMessages(stepContext)
+          : undefined) ?? messages;
+      validateMessages(requestMessages);
+      const activeNames =
+        prepared?.activeTools ?? options.activeTools ?? normalizedTools.names;
+      const activeTools: Record<string, AnyTool> = Object.create(null);
+      for (const name of activeNames) {
+        const definition = getTool(normalizedTools.tools, name);
+        if (!definition)
+          throw new AgentSdkError({
+            code: "INVALID_ARGUMENT",
+            message: `Unknown active tool "${name}"`,
+          });
+        activeTools[name] = definition;
+      }
+      const remainingOutputTokens =
+        options.budget?.tokens?.maxOutputTokens === undefined
+          ? undefined
+          : Math.max(
+              1,
+              options.budget.tokens.maxOutputTokens - totalUsage.outputTokens,
+            );
+      const requestedOutputTokens =
+        prepared?.maxOutputTokens ?? options.maxOutputTokens;
+      const effectiveOutputTokens =
+        remainingOutputTokens === undefined
+          ? requestedOutputTokens
+          : requestedOutputTokens === undefined
+            ? remainingOutputTokens
+            : Math.min(requestedOutputTokens, remainingOutputTokens);
+      const stepOptions: GenerateTextOptions<ToolSet> = {
+        ...options,
+        retry,
+        model: prepared?.model ?? options.model,
+        tools: activeTools,
+        temperature: prepared?.temperature ?? options.temperature,
+        maxOutputTokens: effectiveOutputTokens,
+        providerOptions: prepared?.providerOptions ?? options.providerOptions,
+      };
       const textId = `text-${stepNumber}`;
       const state = {
         textEnded: false,
@@ -323,9 +408,9 @@ async function* runStream<Tools extends ToolSet>(
       let responseModelId: string | undefined;
       let providerMetadata: ProviderMetadata | undefined;
       let stepWarnings: readonly ProviderWarning[] = [];
-      const providerParts = options.model.stream
-        ? nativeParts(options, messages, runSignal)
-        : fallbackParts(options, messages, runSignal);
+      const providerParts = stepOptions.model.stream
+        ? nativeParts(stepOptions, requestMessages, runSignal)
+        : fallbackParts(stepOptions, requestMessages, runSignal);
       let textEndEmitted = false;
       try {
         let providerRead = await providerParts.next();
@@ -385,6 +470,26 @@ async function* runStream<Tools extends ToolSet>(
       totalUsage = addUsage(totalUsage, stepUsage);
       latestText = text;
       warnings.push(...stepWarnings);
+      if (options.budget?.cost) {
+        const stepCost = options.budget.cost.calculate({
+          model: stepOptions.model,
+          usage: stepUsage,
+        });
+        if (
+          !Number.isFinite(stepCost.amount) ||
+          stepCost.amount < 0 ||
+          stepCost.currency !== options.budget.cost.maximum.currency
+        )
+          throw new AgentSdkError({
+            code: "BUDGET_EXCEEDED",
+            message:
+              "Cost calculator currency does not match the configured budget",
+          });
+        cost = {
+          amount: (cost?.amount ?? 0) + stepCost.amount,
+          currency: stepCost.currency,
+        };
+      }
       yield {
         type: "finish",
         stepNumber,
@@ -404,16 +509,53 @@ async function* runStream<Tools extends ToolSet>(
       };
       messages.push(assistantMessage);
       responseMessages.push(assistantMessage);
-      const toolResults = await Promise.all(
-        toolCalls.map((call) =>
-          executeTool(
-            call,
-            getTool(options.tools, call.toolName),
-            runSignal,
-            timeouts.toolMs,
-          ),
-        ),
-      );
+      const stopConditions = options.stopWhen
+        ? Array.isArray(options.stopWhen)
+          ? options.stopWhen
+          : [options.stopWhen]
+        : [];
+      let shouldStop = false;
+      for (const condition of stopConditions) {
+        if (
+          await condition({
+            ...stepContext,
+            usage: totalUsage,
+            toolCalls,
+          })
+        ) {
+          shouldStop = true;
+          break;
+        }
+      }
+      const reachedMaxSteps = stepNumber >= maxSteps && toolCalls.length > 0;
+      const tokenBudget = options.budget?.tokens;
+      const reachedBudget =
+        (tokenBudget?.maxInputTokens !== undefined &&
+          totalUsage.inputTokens >= tokenBudget.maxInputTokens) ||
+        (tokenBudget?.maxOutputTokens !== undefined &&
+          totalUsage.outputTokens >= tokenBudget.maxOutputTokens) ||
+        (tokenBudget?.maxTotalTokens !== undefined &&
+          totalUsage.totalTokens >= tokenBudget.maxTotalTokens) ||
+        (options.budget?.cost !== undefined &&
+          cost !== undefined &&
+          cost.amount >= options.budget.cost.maximum.amount);
+      const toolResults =
+        shouldStop || reachedMaxSteps || reachedBudget
+          ? []
+          : await executeTools(
+              toolCalls,
+              normalizedTools.tools,
+              runSignal,
+              timeouts.toolMs,
+              {
+                runId,
+                stepNumber,
+                context: options.context,
+                requestToolApproval: options.requestToolApproval,
+                callbacks: options.callbacks,
+              },
+              options.toolExecution,
+            );
       messages.push(...toolResults);
       responseMessages.push(...toolResults);
       const step: StepResult = {
@@ -430,18 +572,47 @@ async function* runStream<Tools extends ToolSet>(
         providerMetadata,
       };
       steps.push(step);
-      yield { type: "step-finish", stepNumber, step };
       await options.onStepFinish?.(step);
+      if (options.callbacks?.onStepEnd)
+        await invokeLifecycle(options.callbacks.onStepEnd, "onStepEnd", {
+          ...step,
+          runId,
+          context: options.context,
+        });
+      yield { type: "step-finish", stepNumber, step };
 
-      if (toolCalls.length === 0)
-        return {
+      if (
+        toolCalls.length === 0 ||
+        shouldStop ||
+        reachedMaxSteps ||
+        reachedBudget
+      ) {
+        const result: GenerateTextResult = {
           text,
           finishReason,
+          stopReason:
+            toolCalls.length === 0
+              ? "model-finish"
+              : reachedBudget
+                ? "budget"
+                : reachedMaxSteps
+                  ? "max-steps"
+                  : "stop-condition",
           usage: totalUsage,
           steps,
           responseMessages,
           warnings,
+          cost,
         };
+        if (options.callbacks?.onFinish)
+          await invokeLifecycle(options.callbacks.onFinish, "onFinish", {
+            runId,
+            context: options.context,
+            steps,
+            usage: totalUsage,
+          });
+        return result;
+      }
     }
     throw new AgentSdkError({
       code: "MAX_STEPS_EXCEEDED",
@@ -455,7 +626,33 @@ async function* runStream<Tools extends ToolSet>(
       responseMessages,
       warnings,
     );
-    if (AgentSdkError.isInstance(error)) throw error.withPartialResult(partial);
+    try {
+      if (options.callbacks?.onError)
+        await invokeLifecycle(options.callbacks.onError, "onError", {
+          runId,
+          context: options.context,
+          error,
+        });
+    } catch {
+      // Preserve the stream failure; callback failures must not replace it.
+    }
+    if (AgentSdkError.isInstance(error)) {
+      const completedToolResults = Array.isArray(error.partialResult)
+        ? error.partialResult.filter(
+            (value): value is ToolMessage =>
+              typeof value === "object" &&
+              value !== null &&
+              "role" in value &&
+              value.role === "tool" &&
+              "toolCallId" in value &&
+              typeof value.toolCallId === "string" &&
+              "toolName" in value &&
+              typeof value.toolName === "string" &&
+              "output" in value,
+          )
+        : undefined;
+      throw error.withPartialResult({ ...partial, completedToolResults });
+    }
     throw error;
   }
 }

@@ -10,6 +10,15 @@ import { streamText, type StreamTextResult } from "../generation/stream-text";
 import { AgentSdkError } from "../errors/errors";
 import type { AnyTool, ToolSet } from "../tools/tool";
 import type { LanguageModel } from "../model/types";
+import type {
+  ContextManager,
+  LifecycleCallbacks,
+  PrepareStep,
+  RequestToolApproval,
+  RunBudget,
+  StopCondition,
+  ToolExecutionPolicy,
+} from "../generation/orchestration";
 
 export interface AgentSettings<Tools extends ToolSet> {
   readonly model: LanguageModel;
@@ -22,10 +31,20 @@ export interface AgentSettings<Tools extends ToolSet> {
   readonly temperature?: number | undefined;
   readonly maxOutputTokens?: number | undefined;
   readonly headers?: Readonly<Record<string, string>> | undefined;
+  readonly activeTools?: readonly (keyof Tools & string)[] | undefined;
+  readonly prepareStep?: PrepareStep | undefined;
+  readonly stopWhen?: StopCondition | readonly StopCondition[] | undefined;
+  readonly toolExecution?: ToolExecutionPolicy | undefined;
+  readonly requestToolApproval?: RequestToolApproval | undefined;
+  readonly budget?: RunBudget | undefined;
+  readonly contextManager?: ContextManager | undefined;
+  readonly callbacks?: LifecycleCallbacks | undefined;
 }
 
 export type AgentRunOptions = Prompt & {
   readonly abortSignal?: AbortSignal | undefined;
+  readonly runId?: string | undefined;
+  readonly context?: unknown;
 };
 
 export class Agent<Tools extends ToolSet = ToolSet> {
@@ -62,6 +81,16 @@ export class Agent<Tools extends ToolSet = ToolSet> {
       maxOutputTokens: this.settings.maxOutputTokens,
       headers: this.settings.headers,
       abortSignal: options.abortSignal,
+      runId: options.runId,
+      context: options.context,
+      activeTools: this.settings.activeTools,
+      prepareStep: this.settings.prepareStep,
+      stopWhen: this.settings.stopWhen,
+      toolExecution: this.settings.toolExecution,
+      requestToolApproval: this.settings.requestToolApproval,
+      budget: this.settings.budget,
+      contextManager: this.settings.contextManager,
+      callbacks: this.settings.callbacks,
     };
     return options.prompt !== undefined
       ? { ...shared, prompt: options.prompt }
@@ -89,6 +118,12 @@ export class AgentBuilder {
   }
 
   tool(definition: AnyTool): this {
+    if (this.registeredTools.has(definition.name)) {
+      throw new AgentSdkError({
+        code: "INVALID_ARGUMENT",
+        message: `Tool "${definition.name}" is already registered`,
+      });
+    }
     this.registeredTools.set(definition.name, definition);
     return this;
   }

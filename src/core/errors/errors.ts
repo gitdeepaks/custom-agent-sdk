@@ -11,7 +11,11 @@ export type AgentSdkErrorCode =
   | "ABORTED"
   | "TOOL_NOT_FOUND"
   | "TOOL_INPUT_INVALID"
+  | "TOOL_OUTPUT_INVALID"
   | "TOOL_EXECUTION_FAILED"
+  | "TOOL_APPROVAL_REQUIRED"
+  | "LIFECYCLE_CALLBACK_FAILED"
+  | "BUDGET_EXCEEDED"
   | "MAX_STEPS_EXCEEDED"
   | "INVALID_ARGUMENT";
 
@@ -256,6 +260,7 @@ export class ToolError extends AgentSdkError {
       readonly code:
         | "TOOL_NOT_FOUND"
         | "TOOL_INPUT_INVALID"
+        | "TOOL_OUTPUT_INVALID"
         | "TOOL_EXECUTION_FAILED";
       readonly message: string;
       readonly toolName: string;
@@ -267,6 +272,57 @@ export class ToolError extends AgentSdkError {
     this.name = "ToolError";
     this.toolName = options.toolName;
     this.toolCallId = options.toolCallId;
+  }
+}
+
+export interface ToolApprovalRequest {
+  readonly runId: string;
+  readonly stepNumber: number;
+  readonly toolCallId: string;
+  readonly toolName: string;
+  readonly input: unknown;
+}
+
+export class ToolApprovalRequiredError extends AgentSdkError {
+  readonly requests: readonly ToolApprovalRequest[];
+
+  constructor(options: {
+    readonly requests: readonly ToolApprovalRequest[];
+    readonly message?: string | undefined;
+  }) {
+    super({
+      code: "TOOL_APPROVAL_REQUIRED",
+      message: options.message ?? "Tool execution requires user approval",
+    });
+    this.name = "ToolApprovalRequiredError";
+    this.requests = options.requests;
+  }
+}
+
+export class LifecycleCallbackError extends AgentSdkError {
+  readonly callback: string;
+
+  constructor(options: { readonly callback: string; readonly cause: unknown }) {
+    super({
+      code: "LIFECYCLE_CALLBACK_FAILED",
+      message: `Lifecycle callback "${options.callback}" failed`,
+      cause: options.cause,
+    });
+    this.name = "LifecycleCallbackError";
+    this.callback = options.callback;
+  }
+}
+
+export class BudgetExceededError extends AgentSdkError {
+  readonly budget: "tokens" | "cost";
+
+  constructor(options: {
+    readonly budget: "tokens" | "cost";
+    readonly message: string;
+  }) {
+    super({ code: "BUDGET_EXCEEDED", message: options.message });
+    this.name = "BudgetExceededError";
+    this.budget = options.budget;
   }
 }
 

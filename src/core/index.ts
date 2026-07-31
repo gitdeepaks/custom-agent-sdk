@@ -11,15 +11,19 @@ export {
   InvalidRequestError,
   ModelResponseError,
   NetworkError,
+  BudgetExceededError,
+  LifecycleCallbackError,
   RateLimitError,
   StreamProtocolError,
   TimeoutError,
   ToolError,
+  ToolApprovalRequiredError,
   UnsupportedFeatureError,
   type AgentSdkErrorCode,
   type ErrorMetadata,
   type SerializedAgentSdkError,
   type TimeoutKind,
+  type ToolApprovalRequest,
 } from "./errors/errors";
 export {
   generateText,
@@ -38,6 +42,26 @@ export {
   type StreamTextResult,
 } from "./generation/stream-text";
 export {
+  hasToolCall,
+  isStepCount,
+  tokenBudgetExceeded,
+  type ContextManager,
+  type Cost,
+  type CostBudget,
+  type LifecycleCallbacks,
+  type PrepareStep,
+  type PrepareStepResult,
+  type RequestToolApproval,
+  type RunBudget,
+  type RunContext,
+  type StepContext,
+  type StopCondition,
+  type TokenBudget,
+  type ToolExecutionPolicy,
+  type ToolLifecycleEndEvent,
+  type ToolLifecycleEvent,
+} from "./generation/orchestration";
+export {
   defineSchema,
   tool,
   type AnyTool,
@@ -47,6 +71,7 @@ export {
   type Schema,
   type Tool,
   type ToolExecutionContext,
+  type ToolApprovalOutcome,
   type ToolSet,
 } from "./tools/tool";
 export type {

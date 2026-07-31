@@ -49,11 +49,7 @@ The core `@open-agent/sdk` package does not read these variables. Credentials be
 Create a provider explicitly and pass its protocol-v1 model to the core:
 
 ```ts
-import {
-  Agent,
-  defineSchema,
-  tool,
-} from "@open-agent/sdk";
+import { Agent, defineSchema, tool } from "@open-agent/sdk";
 import { createOpenAI } from "@open-agent/sdk/openai";
 
 const apiKey = Bun.env.OPENAI_API_KEY;
@@ -81,9 +77,12 @@ const weather = tool({
     },
   }),
   async execute({ city }, { abortSignal }) {
-    const response = await fetch(`https://example.com/weather?city=${encodeURIComponent(city)}`, {
-      signal: abortSignal,
-    });
+    const response = await fetch(
+      `https://example.com/weather?city=${encodeURIComponent(city)}`,
+      {
+        signal: abortSignal,
+      },
+    );
     return response.json();
   },
 });
@@ -154,10 +153,75 @@ const stream = streamText({
 
 Only classified transient failures are retried. Once provider output is externally visible, a stream is never replayed. Errors expose stable codes, retry metadata, serializable `toJSON()` output, and `partialResult` when generation has already produced text, usage, messages, or completed steps.
 
+## Tool And Agent Policies
+
+Tools can validate outputs, require approval, and override the default timeout:
+
+```ts
+const removeFile = tool({
+  name: "removeFile",
+  description: "Remove a file within the configured workspace",
+  inputSchema: pathSchema,
+  outputSchema: resultSchema,
+  needsApproval: true,
+  timeoutMs: 10_000,
+  async execute(input, { abortSignal, runId, idempotencyKey }) {
+    return removeWorkspaceFile(input, { abortSignal, runId, idempotencyKey });
+  },
+});
+
+const result = await generateText({
+  model,
+  prompt: "Remove the obsolete build output",
+  tools: { removeFile },
+  maxSteps: 5,
+  toolExecution: {
+    mode: "parallel",
+    maxConcurrency: 4,
+    errorMode: "fail-fast",
+  },
+  requestToolApproval: async (request) =>
+    approvalQueue.waitForDecision(request),
+});
+```
+
+Approval handlers return `approved`, `denied`, `user-approval`, or `not-applicable`. The SDK awaits the decision without replaying prior work. If no handler resolves a required approval, generation fails with `ToolApprovalRequiredError` before the sensitive tool executes.
+
+Agent loops support composable stop conditions, per-step preparation, token and cost budgets, context preparation, and lifecycle callbacks:
+
+```ts
+const result = await generateText({
+  model,
+  prompt: "Investigate and summarize",
+  tools: { search, finalAnswer },
+  maxSteps: 10,
+  stopWhen: [hasToolCall("finalAnswer"), tokenBudgetExceeded(20_000)],
+  prepareStep: ({ stepNumber }) => ({
+    activeTools: stepNumber === 1 ? ["search"] : ["search", "finalAnswer"],
+  }),
+  budget: { tokens: { maxTotalTokens: 20_000 } },
+  contextManager: {
+    prepareMessages: ({ messages }) => pruneForModelContext(messages),
+  },
+  callbacks: {
+    onToolExecutionEnd: ({ toolCall, outcome }) => {
+      auditToolOutcome(toolCall.toolCallId, outcome);
+    },
+  },
+});
+```
+
+`prepareMessages` changes only the provider request view; canonical run history remains intact. Tool execution defaults to bounded parallelism with four workers. Results retain model call order, and completed sibling outputs are included in partial error metadata when another tool fails.
+
 ## Safety And Type Guarantees
 
 - Model and tool boundaries accept `unknown`, never `any`.
 - Tool inputs are validated at runtime before typed execution.
+- Configured tool output schemas are validated before results reach a model.
+- Tool registries are snapshotted, own-property-safe, and reject malformed or duplicate registrations.
+- Sensitive tools support awaited approval decisions and deterministic idempotency keys.
+- Parallel tool execution is bounded and can return failures to the model when configured.
+- Stop conditions and token/cost budgets prevent starting unusable tool or model work.
 - Prompt input is an exclusive union: provide `prompt` or `messages`, never both.
 - Tool loops are bounded with `maxSteps`.
 - Abort signals flow through model and tool calls.

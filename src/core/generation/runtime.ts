@@ -114,13 +114,11 @@ const validateContent = (
     } else if (type === "image" || type === "audio" || type === "file") {
       const data = part["data"];
       const mediaType = part["mediaType"];
-      if (
-        !(
-          typeof data === "string" ||
-          data instanceof Uint8Array ||
-          data instanceof URL
-        )
-      )
+      if (!(
+        typeof data === "string" ||
+        data instanceof Uint8Array ||
+        data instanceof URL
+      ))
         throw error(`${path}[${partIndex}].data is invalid`);
       if (
         (type === "audio" || type === "file") &&
@@ -268,6 +266,10 @@ const validateMessage = (message: unknown, index: number): void => {
   invalidArgument(`messages[${index}] must be an object`);
 };
 
+export const validateMessages = (messages: readonly ModelMessage[]): void => {
+  messages.forEach(validateMessage);
+};
+
 export const validateOptions = <Tools extends ToolSet>(
   options: GenerateTextOptions<Tools>,
 ): void => {
@@ -285,7 +287,7 @@ export const validateOptions = <Tools extends ToolSet>(
     invalidArgument("Exactly one of prompt or messages must be provided");
   if (options.prompt !== undefined && typeof options.prompt !== "string")
     invalidArgument("prompt must be a string");
-  if (options.messages !== undefined) options.messages.forEach(validateMessage);
+  if (options.messages !== undefined) validateMessages(options.messages);
   if (
     options.providerOptions !== undefined &&
     !isJsonValue(options.providerOptions)
@@ -321,6 +323,59 @@ export const validateOptions = <Tools extends ToolSet>(
   validateTimeout("timeouts.chunkMs", options.timeouts?.chunkMs);
   validateTimeout("timeouts.toolMs", options.timeouts?.toolMs);
   validateRetryOptions(options.retry);
+  if (options.toolExecution?.maxConcurrency !== undefined)
+    validateInteger(
+      "toolExecution.maxConcurrency",
+      options.toolExecution.maxConcurrency,
+      1,
+      100,
+    );
+  if (
+    options.toolExecution?.mode !== undefined &&
+    options.toolExecution.mode !== "sequential" &&
+    options.toolExecution.mode !== "parallel"
+  )
+    invalidArgument("toolExecution.mode must be sequential or parallel");
+  if (
+    options.toolExecution?.errorMode !== undefined &&
+    options.toolExecution.errorMode !== "fail-fast" &&
+    options.toolExecution.errorMode !== "return-errors"
+  )
+    invalidArgument(
+      "toolExecution.errorMode must be fail-fast or return-errors",
+    );
+  const tokenBudget = options.budget?.tokens;
+  if (tokenBudget?.maxInputTokens !== undefined)
+    validateInteger(
+      "budget.tokens.maxInputTokens",
+      tokenBudget.maxInputTokens,
+      1,
+      1_000_000_000,
+    );
+  if (tokenBudget?.maxOutputTokens !== undefined)
+    validateInteger(
+      "budget.tokens.maxOutputTokens",
+      tokenBudget.maxOutputTokens,
+      1,
+      1_000_000_000,
+    );
+  if (tokenBudget?.maxTotalTokens !== undefined)
+    validateInteger(
+      "budget.tokens.maxTotalTokens",
+      tokenBudget.maxTotalTokens,
+      1,
+      1_000_000_000,
+    );
+  const maximumCost = options.budget?.cost?.maximum;
+  if (
+    maximumCost !== undefined &&
+    (!Number.isFinite(maximumCost.amount) ||
+      maximumCost.amount <= 0 ||
+      maximumCost.currency.trim().length === 0)
+  )
+    invalidArgument(
+      "budget.cost.maximum must have a positive finite amount and currency",
+    );
 
   if (options.abortSignal?.aborted)
     throw toAbortError(
