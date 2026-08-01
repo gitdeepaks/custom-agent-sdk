@@ -10,6 +10,7 @@ export {
   AuthenticationError,
   InvalidRequestError,
   ModelResponseError,
+  OutputValidationError,
   NetworkError,
   BudgetExceededError,
   LifecycleCallbackError,
@@ -36,6 +37,19 @@ export {
   type StepResult,
   type TimeoutOptions,
 } from "./generation/generate-text";
+export {
+  generateObject,
+  streamObject,
+  type ArrayOutputOptions,
+  type EnumOutputOptions,
+  type GenerateObjectOptions,
+  type GenerateObjectResult,
+  type JsonOutputOptions,
+  type ObjectOutputOptions,
+  type OutputRepair,
+  type OutputRepairContext,
+  type StreamObjectResult,
+} from "./generation/generate-object";
 export {
   streamText,
   type StreamPart,
@@ -86,6 +100,7 @@ export type {
   JsonValue,
   LanguageModel,
   ModelMessage,
+  ModelOutputFormat,
   ModelRequest,
   ModelResponse,
   ModelStreamPart,

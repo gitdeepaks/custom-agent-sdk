@@ -4,7 +4,7 @@ A provider-neutral, type-safe agent SDK for TypeScript, designed around the ergo
 
 ## Status
 
-This repository includes a provider-neutral core plus first-party OpenAI Responses API and Anthropic Messages API adapters. It supports text generation, multipart messages, native streaming, runtime-validated tools, bounded tool loops, retries, cancellation, normalized provider errors and usage, and a reusable `Agent` API.
+This repository includes a provider-neutral core plus first-party OpenAI Responses API and Anthropic Messages API adapters. It supports text and structured generation, multipart messages, native streaming, runtime-validated tools, bounded tool loops, retries, cancellation, normalized provider errors and usage, and a reusable `Agent` API.
 
 ## Requirements
 
@@ -120,6 +120,24 @@ const finalResult = await stream.result;
 ```
 
 `fullStream` is the canonical bounded event stream. `textStream` is a text-only view over the same session. They are intentionally alternative views: consume one, not both. This avoids `ReadableStream.tee()` buffering while preserving provider backpressure. Await `result` after consuming the selected stream.
+
+## Structured Output
+
+`generateObject()` supports object, array, enum, and arbitrary JSON modes. OpenAI and Anthropic receive native structured-output constraints, and the core validates every final value before returning typed data:
+
+```ts
+const profile = await generateObject({
+  model,
+  prompt: "Generate a user profile",
+  schema: profileSchema,
+});
+
+console.log(profile.object);
+```
+
+Use `mode: "array"` with an element schema, `mode: "enum"` with a literal `values` list, or `mode: "json"` for any `JsonValue`. An optional `repair` callback runs at most once after validation fails, and its result is fully revalidated.
+
+`streamObject()` exposes demand-driven JSON snapshots through `partialObjectStream`. These snapshots are typed as `JsonValue` because incomplete data has not passed the final schema. Only `(await stream.result).object` is returned as the schema-inferred type. `Agent.runObject()` and `Agent.streamObject()` provide the same behavior with agent settings and tool loops.
 
 Native and fallback models emit the same ordered SDK protocol:
 

@@ -5,6 +5,7 @@ export type AgentSdkErrorCode =
   | "UNSUPPORTED_FEATURE"
   | "MODEL_ERROR"
   | "MODEL_RESPONSE_INVALID"
+  | "OUTPUT_VALIDATION_FAILED"
   | "STREAM_PROTOCOL_ERROR"
   | "NETWORK_ERROR"
   | "TIMEOUT"
@@ -236,6 +237,22 @@ export class ModelResponseError extends AgentSdkError {
   ) {
     super({ code: "MODEL_RESPONSE_INVALID", ...options });
     this.name = "ModelResponseError";
+  }
+}
+
+export class OutputValidationError extends AgentSdkError {
+  constructor(
+    options: ErrorMetadata & {
+      readonly message?: string;
+      readonly cause?: unknown;
+    } = {},
+  ) {
+    super({
+      code: "OUTPUT_VALIDATION_FAILED",
+      message: options.message ?? "The model output failed validation",
+      ...options,
+    });
+    this.name = "OutputValidationError";
   }
 }
 

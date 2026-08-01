@@ -161,6 +161,13 @@ export interface ModelTool {
   readonly inputSchema: JsonValue;
 }
 
+export interface ModelOutputFormat {
+  readonly type: "json";
+  readonly schema?: JsonValue | undefined;
+  readonly name?: string | undefined;
+  readonly description?: string | undefined;
+}
+
 export interface ModelRequest {
   readonly messages: readonly ModelMessage[];
   readonly tools: readonly ModelTool[];
@@ -169,6 +176,7 @@ export interface ModelRequest {
   readonly abortSignal?: AbortSignal | undefined;
   readonly headers?: Readonly<Record<string, string>> | undefined;
   readonly providerOptions?: ProviderOptions | undefined;
+  readonly outputFormat?: ModelOutputFormat | undefined;
 }
 
 export interface ModelResponse {

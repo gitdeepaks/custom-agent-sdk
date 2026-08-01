@@ -30,6 +30,7 @@ import {
   type FinishReason,
   type LanguageModel,
   type ModelMessage,
+  type ModelOutputFormat,
   type ModelRequest,
   type ModelResponse,
   type ProviderMetadata,
@@ -420,6 +421,7 @@ export const createModelRequest = <Tools extends ToolSet>(
     readonly temperature?: number | undefined;
     readonly maxOutputTokens?: number | undefined;
     readonly providerOptions?: ProviderOptions | undefined;
+    readonly outputFormat?: ModelOutputFormat | undefined;
   },
 ): ModelRequest => ({
   messages: [...messages],
@@ -429,6 +431,7 @@ export const createModelRequest = <Tools extends ToolSet>(
   abortSignal,
   headers: options.headers,
   providerOptions: overrides?.providerOptions ?? options.providerOptions,
+  outputFormat: overrides?.outputFormat,
 });
 
 export const executeTools = async (
@@ -515,8 +518,9 @@ const budgetExceeded = (
     cost !== undefined &&
     cost.amount >= budget.cost.maximum.amount);
 
-export const generateText = async <Tools extends ToolSet = ToolSet>(
+export const generateTextInternal = async <Tools extends ToolSet = ToolSet>(
   options: GenerateTextOptions<Tools>,
+  outputFormat?: ModelOutputFormat,
 ): Promise<GenerateTextResult> => {
   validateOptions(options);
   const maxSteps = options.maxSteps ?? 1;
@@ -606,6 +610,7 @@ export const generateText = async <Tools extends ToolSet = ToolSet>(
           temperature: prepared?.temperature,
           maxOutputTokens: effectiveOutputTokens,
           providerOptions: prepared?.providerOptions,
+          outputFormat,
         }),
         {
           maxRetries,
@@ -770,3 +775,7 @@ export const generateText = async <Tools extends ToolSet = ToolSet>(
     throw error;
   }
 };
+
+export const generateText = <Tools extends ToolSet = ToolSet>(
+  options: GenerateTextOptions<Tools>,
+): Promise<GenerateTextResult> => generateTextInternal(options);

@@ -474,6 +474,16 @@ const prepareRequest = (
       description: tool.description,
       input_schema: tool.inputSchema,
     }));
+  if (request.outputFormat)
+    body["output_config"] = {
+      format:
+        request.outputFormat.schema === undefined
+          ? { type: "json_schema", schema: {} }
+          : {
+              type: "json_schema",
+              schema: request.outputFormat.schema,
+            },
+    };
   readProviderOptions(request, body, warnings, settings);
   return { body, warnings };
 };

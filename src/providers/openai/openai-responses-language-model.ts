@@ -393,9 +393,30 @@ const prepareRequest = (
     parameters: tool.inputSchema,
     strict: false,
   }));
+  const options = providerOptions(request, warnings, settings);
+  const configuredText = options["text"];
+  const text = request.outputFormat
+    ? {
+        ...(isRecord(configuredText) ? configuredText : {}),
+        format:
+          request.outputFormat.schema === undefined
+            ? { type: "json_object" }
+            : {
+                type: "json_schema",
+                name: request.outputFormat.name ?? "structured_output",
+                schema: request.outputFormat.schema,
+                strict: true,
+                ...(request.outputFormat.description === undefined
+                  ? {}
+                  : { description: request.outputFormat.description }),
+              },
+      }
+    : configuredText;
+  const { text: _configuredText, ...optionsWithoutText } = options;
   return {
     body: {
-      ...providerOptions(request, warnings, settings),
+      ...optionsWithoutText,
+      ...(text === undefined ? {} : { text }),
       model: modelId,
       input,
       stream,

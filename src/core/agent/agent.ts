@@ -7,6 +7,17 @@ import {
   type TimeoutOptions,
 } from "../generation/generate-text";
 import { streamText, type StreamTextResult } from "../generation/stream-text";
+import {
+  generateObjectInternal,
+  streamObjectInternal,
+  type ArrayOutputOptions,
+  type EnumOutputOptions,
+  type GenerateObjectResult,
+  type JsonOutputOptions,
+  type ObjectOutputOptions,
+  type OutputRepair,
+  type StreamObjectResult,
+} from "../generation/generate-object";
 import { AgentSdkError } from "../errors/errors";
 import type { AnyTool, ToolSet } from "../tools/tool";
 import type { LanguageModel } from "../model/types";
@@ -47,6 +58,10 @@ export type AgentRunOptions = Prompt & {
   readonly context?: unknown;
 };
 
+type AgentStructuredRunOptions = AgentRunOptions & {
+  readonly repair?: OutputRepair | undefined;
+};
+
 export class Agent<Tools extends ToolSet = ToolSet> {
   readonly settings: AgentSettings<Tools>;
 
@@ -64,6 +79,54 @@ export class Agent<Tools extends ToolSet = ToolSet> {
 
   stream(options: AgentRunOptions): StreamTextResult {
     return streamText(this.toGenerateOptions(options));
+  }
+
+  runObject<Output>(
+    options: AgentStructuredRunOptions & ObjectOutputOptions<Output>,
+  ): Promise<GenerateObjectResult<Output>>;
+  runObject<Element>(
+    options: AgentStructuredRunOptions & ArrayOutputOptions<Element>,
+  ): Promise<GenerateObjectResult<readonly Element[]>>;
+  runObject<const Values extends readonly string[]>(
+    options: AgentStructuredRunOptions & EnumOutputOptions<Values>,
+  ): Promise<GenerateObjectResult<Values[number]>>;
+  runObject(
+    options: AgentStructuredRunOptions & JsonOutputOptions,
+  ): Promise<GenerateObjectResult<import("../model/types").JsonValue>>;
+  runObject(
+    options: AgentStructuredRunOptions &
+      (
+        | ObjectOutputOptions<unknown>
+        | ArrayOutputOptions<unknown>
+        | EnumOutputOptions<readonly string[]>
+        | JsonOutputOptions
+      ),
+  ): Promise<GenerateObjectResult<unknown>> {
+    return generateObjectInternal(this.toGenerateOptions(options), options);
+  }
+
+  streamObject<Output>(
+    options: AgentStructuredRunOptions & ObjectOutputOptions<Output>,
+  ): StreamObjectResult<Output>;
+  streamObject<Element>(
+    options: AgentStructuredRunOptions & ArrayOutputOptions<Element>,
+  ): StreamObjectResult<readonly Element[]>;
+  streamObject<const Values extends readonly string[]>(
+    options: AgentStructuredRunOptions & EnumOutputOptions<Values>,
+  ): StreamObjectResult<Values[number]>;
+  streamObject(
+    options: AgentStructuredRunOptions & JsonOutputOptions,
+  ): StreamObjectResult<import("../model/types").JsonValue>;
+  streamObject(
+    options: AgentStructuredRunOptions &
+      (
+        | ObjectOutputOptions<unknown>
+        | ArrayOutputOptions<unknown>
+        | EnumOutputOptions<readonly string[]>
+        | JsonOutputOptions
+      ),
+  ): StreamObjectResult<unknown> {
+    return streamObjectInternal(this.toGenerateOptions(options), options);
   }
 
   private toGenerateOptions(

@@ -27,6 +27,7 @@ import {
   zeroUsage,
   type FinishReason,
   type ModelMessage,
+  type ModelOutputFormat,
   type ModelStreamPart,
   type ProviderMetadata,
   type ProviderWarning,
@@ -120,6 +121,7 @@ const openNativeStream = async <Tools extends ToolSet>(
   options: GenerateTextOptions<Tools>,
   messages: readonly ModelMessage[],
   runSignal: AbortSignal,
+  outputFormat: ModelOutputFormat | undefined,
 ): Promise<OpenNativeStream> => {
   const maxRetries = options.retry?.maxRetries ?? options.maxRetries ?? 2;
   const timeouts = getTimeouts(options.timeouts);
@@ -137,7 +139,9 @@ const openNativeStream = async <Tools extends ToolSet>(
         });
       const providerStream = await raceWithSignal(
         options.model.stream(
-          createModelRequest(options, messages, requestOperation.signal),
+          createModelRequest(options, messages, requestOperation.signal, {
+            outputFormat,
+          }),
         ),
         requestOperation.signal,
         "Model stream request was aborted",
@@ -230,8 +234,14 @@ async function* nativeParts<Tools extends ToolSet>(
   options: GenerateTextOptions<Tools>,
   messages: readonly ModelMessage[],
   runSignal: AbortSignal,
+  outputFormat: ModelOutputFormat | undefined,
 ): AsyncGenerator<ModelStreamPart, void, void> {
-  const opened = await openNativeStream(options, messages, runSignal);
+  const opened = await openNativeStream(
+    options,
+    messages,
+    runSignal,
+    outputFormat,
+  );
   const timeouts = getTimeouts(options.timeouts);
   let completed = false;
   try {
@@ -270,11 +280,12 @@ async function* fallbackParts<Tools extends ToolSet>(
   options: GenerateTextOptions<Tools>,
   messages: readonly ModelMessage[],
   runSignal: AbortSignal,
+  outputFormat: ModelOutputFormat | undefined,
 ): AsyncGenerator<ModelStreamPart, void, void> {
   const timeouts = getTimeouts(options.timeouts);
   const response = await callModel(
     options.model,
-    createModelRequest(options, messages, runSignal),
+    createModelRequest(options, messages, runSignal, { outputFormat }),
     {
       maxRetries: options.retry?.maxRetries ?? options.maxRetries ?? 2,
       retry: options.retry,
@@ -300,6 +311,7 @@ async function* fallbackParts<Tools extends ToolSet>(
 async function* runStream<Tools extends ToolSet>(
   options: GenerateTextOptions<Tools>,
   runSignal: AbortSignal,
+  outputFormat: ModelOutputFormat | undefined,
 ): AsyncGenerator<StreamPart, GenerateTextResult, void> {
   validateOptions({ ...options, abortSignal: runSignal });
   const maxSteps = options.maxSteps ?? 1;
@@ -409,8 +421,8 @@ async function* runStream<Tools extends ToolSet>(
       let providerMetadata: ProviderMetadata | undefined;
       let stepWarnings: readonly ProviderWarning[] = [];
       const providerParts = stepOptions.model.stream
-        ? nativeParts(stepOptions, requestMessages, runSignal)
-        : fallbackParts(stepOptions, requestMessages, runSignal);
+        ? nativeParts(stepOptions, requestMessages, runSignal, outputFormat)
+        : fallbackParts(stepOptions, requestMessages, runSignal, outputFormat);
       let textEndEmitted = false;
       try {
         let providerRead = await providerParts.next();
@@ -672,7 +684,10 @@ class StreamSession {
   private resolveResult: (result: GenerateTextResult) => void = () => undefined;
   private rejectResult: (error: unknown) => void = () => undefined;
 
-  constructor(options: GenerateTextOptions) {
+  constructor(
+    options: GenerateTextOptions,
+    outputFormat: ModelOutputFormat | undefined,
+  ) {
     const relayAbort = (): void =>
       this.abortController.abort(options.abortSignal?.reason);
     if (options.abortSignal?.aborted) relayAbort();
@@ -680,7 +695,11 @@ class StreamSession {
       options.abortSignal?.addEventListener("abort", relayAbort, {
         once: true,
       });
-    this.iterator = runStream(options, this.abortController.signal);
+    this.iterator = runStream(
+      options,
+      this.abortController.signal,
+      outputFormat,
+    );
     this.result = new Promise<GenerateTextResult>((resolve, reject) => {
       this.resolveResult = resolve;
       this.rejectResult = reject;
@@ -795,14 +814,19 @@ const createTextStream = (session: StreamSession): ReadableStream<string> =>
     { highWaterMark: 0 },
   );
 
-export const streamText = <Tools extends ToolSet = ToolSet>(
+export const streamTextInternal = <Tools extends ToolSet = ToolSet>(
   options: GenerateTextOptions<Tools>,
+  outputFormat?: ModelOutputFormat,
 ): StreamTextResult => {
   validateOptions(options);
-  const session = new StreamSession(options);
+  const session = new StreamSession(options, outputFormat);
   return {
     fullStream: createFullStream(session),
     textStream: createTextStream(session),
     result: session.result,
   };
 };
+
+export const streamText = <Tools extends ToolSet = ToolSet>(
+  options: GenerateTextOptions<Tools>,
+): StreamTextResult => streamTextInternal(options);
