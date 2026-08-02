@@ -37,5 +37,8 @@
   "engines": {
     "bun": ">=1.2.0"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "@opentelemetry/api": "^1.9.1"
+  }
 }

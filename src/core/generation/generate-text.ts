@@ -50,6 +50,12 @@ import {
   validateMessages,
   validateOptions,
 } from "./runtime";
+import { wrapLanguageModel } from "../middleware/middleware";
+import {
+  createTelemetryRuntime,
+  type TelemetryOptions,
+  type TelemetryRuntime,
+} from "../telemetry/telemetry";
 
 export type Prompt =
   | { readonly prompt: string; readonly messages?: never }
@@ -132,6 +138,7 @@ export type GenerateTextOptions<Tools extends ToolSet = ToolSet> = Prompt & {
   readonly budget?: RunBudget | undefined;
   readonly contextManager?: ContextManager | undefined;
   readonly callbacks?: LifecycleCallbacks | undefined;
+  readonly telemetry?: TelemetryOptions | undefined;
   readonly onStepFinish?:
     ((step: StepResult) => void | Promise<void>) | undefined;
 };
@@ -249,6 +256,7 @@ export const executeTool = async (
     readonly context?: unknown;
     readonly requestToolApproval?: RequestToolApproval | undefined;
     readonly callbacks?: LifecycleCallbacks | undefined;
+    readonly telemetry?: TelemetryRuntime | undefined;
   },
 ): Promise<ToolMessage> => {
   if (!definition) {
@@ -333,6 +341,11 @@ export const executeTool = async (
         toolCall: call,
       },
     );
+  const telemetryScope = run.telemetry?.startTool(
+    call.toolName,
+    call.toolCallId,
+    call.input,
+  );
   const operation = createOperationSignal(
     abortSignal,
     definition.timeoutMs ?? timeoutMs,
@@ -353,6 +366,10 @@ export const executeTool = async (
       toolName: call.toolName,
       output,
     };
+    if (telemetryScope) {
+      run.telemetry?.recordToolOutput(telemetryScope, output);
+      telemetryScope.endSuccess();
+    }
     if (run.callbacks?.onToolExecutionEnd)
       await invokeLifecycle(
         run.callbacks.onToolExecutionEnd,
@@ -368,6 +385,7 @@ export const executeTool = async (
       );
     return result;
   } catch (error) {
+    telemetryScope?.endError(error);
     if (
       AgentSdkError.isInstance(error) &&
       (error.code === "ABORTED" || error.code === "TIMEOUT")
@@ -534,13 +552,16 @@ export const generateTextInternal = async <Tools extends ToolSet = ToolSet>(
   let text = "";
   const warnings: ProviderWarning[] = [];
   const runId = options.runId ?? crypto.randomUUID();
+  const telemetry = createTelemetryRuntime(options.telemetry);
+  const runTelemetry = telemetry?.startRun("generate_text", runId);
   let cost: Cost | undefined;
-  const retry = options.callbacks?.onRetry
+  const retry = options.callbacks?.onRetry || telemetry
     ? {
         ...options.retry,
         async onRetry(event: RetryEvent): Promise<void> {
           await options.retry?.onRetry?.(event);
           await invokeLifecycle(options.callbacks?.onRetry, "onRetry", event);
+          telemetry?.recordRetry(event);
         },
       }
     : options.retry;
@@ -588,6 +609,12 @@ export const generateTextInternal = async <Tools extends ToolSet = ToolSet>(
         activeTools[name] = definition;
       }
       const model = prepared?.model ?? options.model;
+      const instrumentedModel = telemetry
+        ? wrapLanguageModel({
+            model,
+            middleware: [telemetry.modelMiddleware(stepNumber)],
+          })
+        : model;
       const remainingOutputTokens =
         options.budget?.tokens?.maxOutputTokens === undefined
           ? undefined
@@ -604,7 +631,7 @@ export const generateTextInternal = async <Tools extends ToolSet = ToolSet>(
             ? remainingOutputTokens
             : Math.min(requestedOutputTokens, remainingOutputTokens);
       const response = await callModel(
-        model,
+        instrumentedModel,
         createModelRequest(options, requestMessages, options.abortSignal, {
           tools: activeTools,
           temperature: prepared?.temperature,
@@ -640,6 +667,7 @@ export const generateTextInternal = async <Tools extends ToolSet = ToolSet>(
           amount: (cost?.amount ?? 0) + stepCost.amount,
           currency: stepCost.currency,
         };
+        telemetry?.recordCost(stepCost, model.provider, model.modelId);
       }
       const assistantMessage: ModelMessage = {
         role: "assistant",
@@ -672,6 +700,7 @@ export const generateTextInternal = async <Tools extends ToolSet = ToolSet>(
                 context: options.context,
                 requestToolApproval: options.requestToolApproval,
                 callbacks: options.callbacks,
+                telemetry,
               },
               options.toolExecution,
             );
@@ -730,6 +759,11 @@ export const generateTextInternal = async <Tools extends ToolSet = ToolSet>(
             steps,
             usage,
           });
+        runTelemetry?.endSuccess({
+          "open_agent.finish_reason": response.finishReason,
+          "gen_ai.usage.input_tokens": usage.inputTokens,
+          "gen_ai.usage.output_tokens": usage.outputTokens,
+        });
         return result;
       }
     }
@@ -738,6 +772,7 @@ export const generateTextInternal = async <Tools extends ToolSet = ToolSet>(
       message: `Generation did not finish within ${maxSteps} step${maxSteps === 1 ? "" : "s"}`,
     });
   } catch (error) {
+    runTelemetry?.endError(error);
     const partial = createPartialResult(
       text,
       usage,

@@ -125,3 +125,31 @@ export type {
 } from "./model/types";
 export { PROVIDER_PROTOCOL_VERSION } from "./model/types";
 export type { Provider, ProviderFactory } from "./provider/provider";
+export {
+  MemoryLanguageModelCache,
+  cacheMiddleware,
+  defaultSettingsMiddleware,
+  loggingMiddleware,
+  retryMiddleware,
+  wrapLanguageModel,
+  type CacheKeyContext,
+  type CacheMiddlewareOptions,
+  type DefaultModelSettings,
+  type GenerateModelNext,
+  type LanguageModelCache,
+  type LanguageModelCacheEntry,
+  type LanguageModelLogEvent,
+  type LanguageModelLogger,
+  type LanguageModelMiddleware,
+  type LanguageModelMiddlewareContext,
+  type LoggingMiddlewareOptions,
+  type RetryMiddlewareOptions,
+  type StreamModelNext,
+  type WrapLanguageModelOptions,
+} from "./middleware/middleware";
+export {
+  telemetryMiddleware,
+  type TelemetryAttributeValue,
+  type TelemetryAttributes,
+  type TelemetryOptions,
+} from "./telemetry/telemetry";

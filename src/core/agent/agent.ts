@@ -21,6 +21,7 @@ import {
 import { AgentSdkError } from "../errors/errors";
 import type { AnyTool, ToolSet } from "../tools/tool";
 import type { LanguageModel } from "../model/types";
+import type { TelemetryOptions } from "../telemetry/telemetry";
 import type {
   ContextManager,
   LifecycleCallbacks,
@@ -50,6 +51,7 @@ export interface AgentSettings<Tools extends ToolSet> {
   readonly budget?: RunBudget | undefined;
   readonly contextManager?: ContextManager | undefined;
   readonly callbacks?: LifecycleCallbacks | undefined;
+  readonly telemetry?: TelemetryOptions | undefined;
 }
 
 export type AgentRunOptions = Prompt & {
@@ -154,6 +156,7 @@ export class Agent<Tools extends ToolSet = ToolSet> {
       budget: this.settings.budget,
       contextManager: this.settings.contextManager,
       callbacks: this.settings.callbacks,
+      telemetry: this.settings.telemetry,
     };
     return options.prompt !== undefined
       ? { ...shared, prompt: options.prompt }

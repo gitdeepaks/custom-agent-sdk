@@ -46,6 +46,8 @@ import {
   validateOptions,
   type OperationSignal,
 } from "./runtime";
+import { wrapLanguageModel } from "../middleware/middleware";
+import { createTelemetryRuntime } from "../telemetry/telemetry";
 
 export type StreamPart =
   | { readonly type: "step-start"; readonly stepNumber: number }
@@ -324,8 +326,10 @@ async function* runStream<Tools extends ToolSet>(
   const warnings: ProviderWarning[] = [];
   const normalizedTools = normalizeToolRegistry(options.tools);
   const runId = options.runId ?? crypto.randomUUID();
+  const telemetry = createTelemetryRuntime(options.telemetry);
+  const runTelemetry = telemetry?.startRun("stream_text", runId);
   let cost: Cost | undefined;
-  const retry = options.callbacks?.onRetry
+  const retry = options.callbacks?.onRetry || telemetry
     ? {
         ...options.retry,
         async onRetry(
@@ -333,6 +337,7 @@ async function* runStream<Tools extends ToolSet>(
         ): Promise<void> {
           await options.retry?.onRetry?.(event);
           await invokeLifecycle(options.callbacks?.onRetry, "onRetry", event);
+          telemetry?.recordRetry(event);
         },
       }
     : options.retry;
@@ -396,10 +401,16 @@ async function* runStream<Tools extends ToolSet>(
           : requestedOutputTokens === undefined
             ? remainingOutputTokens
             : Math.min(requestedOutputTokens, remainingOutputTokens);
+      const selectedModel = prepared?.model ?? options.model;
       const stepOptions: GenerateTextOptions<ToolSet> = {
         ...options,
         retry,
-        model: prepared?.model ?? options.model,
+        model: telemetry
+          ? wrapLanguageModel({
+              model: selectedModel,
+              middleware: [telemetry.modelMiddleware(stepNumber)],
+            })
+          : selectedModel,
         tools: activeTools,
         temperature: prepared?.temperature ?? options.temperature,
         maxOutputTokens: effectiveOutputTokens,
@@ -501,6 +512,11 @@ async function* runStream<Tools extends ToolSet>(
           amount: (cost?.amount ?? 0) + stepCost.amount,
           currency: stepCost.currency,
         };
+        telemetry?.recordCost(
+          stepCost,
+          selectedModel.provider,
+          selectedModel.modelId,
+        );
       }
       yield {
         type: "finish",
@@ -565,6 +581,7 @@ async function* runStream<Tools extends ToolSet>(
                 context: options.context,
                 requestToolApproval: options.requestToolApproval,
                 callbacks: options.callbacks,
+                telemetry,
               },
               options.toolExecution,
             );
@@ -623,6 +640,11 @@ async function* runStream<Tools extends ToolSet>(
             steps,
             usage: totalUsage,
           });
+        runTelemetry?.endSuccess({
+          "open_agent.finish_reason": finishReason,
+          "gen_ai.usage.input_tokens": totalUsage.inputTokens,
+          "gen_ai.usage.output_tokens": totalUsage.outputTokens,
+        });
         return result;
       }
     }
@@ -631,6 +653,7 @@ async function* runStream<Tools extends ToolSet>(
       message: `Generation did not finish within ${maxSteps} step${maxSteps === 1 ? "" : "s"}`,
     });
   } catch (error) {
+    runTelemetry?.endError(error);
     const partial = createPartialResult(
       latestText,
       totalUsage,

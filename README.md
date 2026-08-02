@@ -231,6 +231,40 @@ const result = await generateText({
 
 `prepareMessages` changes only the provider request view; canonical run history remains intact. Tool execution defaults to bounded parallelism with four workers. Results retain model call order, and completed sibling outputs are included in partial error metadata when another tool fails.
 
+## Middleware And Telemetry
+
+Wrap any protocol-v1 model with provider-neutral middleware. The first item is outermost, request defaults never overwrite explicit values, cache keys hash all request settings including headers, and stream middleware remains pull-based:
+
+```ts
+const productionModel = wrapLanguageModel({
+  model,
+  middleware: [
+    loggingMiddleware({ logger }),
+    defaultSettingsMiddleware({ temperature: 0.2 }),
+    cacheMiddleware({ cache: new MemoryLanguageModelCache(), ttlMs: 60_000 }),
+    retryMiddleware({ maxRetries: 2 }),
+  ],
+});
+```
+
+`loggingMiddleware` excludes prompts and responses by default. Set `recordInputs` or `recordOutputs` only when the application has an appropriate retention policy, and provide `redact` before recording sensitive content. Cache entries contain complete model responses independently of logging and telemetry privacy settings; production applications should provide a tenant-scoped, encrypted `LanguageModelCache` when responses are sensitive.
+
+OpenTelemetry instrumentation is opt-in on generation calls or `AgentSettings`:
+
+```ts
+const result = await generateText({
+  model: productionModel,
+  prompt: "Summarize the incident",
+  telemetry: {
+    enabled: true,
+    recordInputs: false,
+    recordOutputs: false,
+  },
+});
+```
+
+When omitted or configured with `enabled: false`, telemetry does not obtain a tracer or meter and adds no stream wrappers. Enabled telemetry records GenAI model spans and token metrics plus run, retry, first-chunk, chunk-interval, tool-duration, and configured cost-budget metrics. Prompts, model outputs, tool data, headers, provider options, and runtime context are not recorded by default. Headers are never recorded.
+
 ## Safety And Type Guarantees
 
 - Model and tool boundaries accept `unknown`, never `any`.
@@ -284,8 +318,10 @@ src/
 │   ├── generation/
 │   │   ├── generate-text.ts    # Generation and tool loop
 │   │   └── stream-text.ts      # Provider-native streaming
+│   ├── middleware/middleware.ts # Model middleware and built-ins
 │   ├── model/types.ts          # Provider protocol and messages
 │   ├── provider/provider.ts    # Provider factory contract
+│   ├── telemetry/telemetry.ts   # OpenTelemetry GenAI instrumentation
 │   └── tools/tool.ts           # Schemas and typed tools
 └── providers/
     ├── openai/                 # OpenAI Responses API adapter
