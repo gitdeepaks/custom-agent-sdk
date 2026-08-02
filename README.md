@@ -1,8 +1,14 @@
 # Open Agent SDK
 
+[![npm prerelease](https://img.shields.io/npm/v/@deepaksankhyan91/open-agent-sdk/next?label=npm%20next)](https://www.npmjs.com/package/@deepaksankhyan91/open-agent-sdk)
+[![CI](https://github.com/gitdeepaks/custom-agent-sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/gitdeepaks/custom-agent-sdk/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
+
 A provider-neutral, type-safe agent SDK for TypeScript, designed around the ergonomic core of the Vercel AI SDK while keeping providers and application concerns separate.
 
 ## Status
+
+The SDK is published on npm as [`@deepaksankhyan91/open-agent-sdk`](https://www.npmjs.com/package/@deepaksankhyan91/open-agent-sdk). It is currently released through the `next` prerelease channel.
 
 This repository includes a provider-neutral core plus first-party OpenAI Responses API and Anthropic Messages API adapters. It supports text and structured generation, multipart messages, native streaming, runtime-validated tools, bounded tool loops, retries, cancellation, normalized provider errors and usage, and a reusable `Agent` API.
 
@@ -14,14 +20,20 @@ This repository includes a provider-neutral core plus first-party OpenAI Respons
 ## Install
 
 ```bash
-bun add @deepaksankhyan91/open-agent-sdk
+bun add @deepaksankhyan91/open-agent-sdk@next
 ```
 
 The package can also be installed with npm:
 
 ```bash
-npm install @deepaksankhyan91/open-agent-sdk
+npm install @deepaksankhyan91/open-agent-sdk@next
 ```
+
+Public entry points:
+
+- `@deepaksankhyan91/open-agent-sdk` for core generation, tools, agents, middleware, and telemetry.
+- `@deepaksankhyan91/open-agent-sdk/openai` for the OpenAI Responses API adapter.
+- `@deepaksankhyan91/open-agent-sdk/anthropic` for the Anthropic Messages API adapter.
 
 ## Environment Variables
 
