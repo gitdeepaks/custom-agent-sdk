@@ -87,7 +87,10 @@ export interface PartialGenerateTextResult {
 export interface GenerateTextResult extends PartialGenerateTextResult {
   readonly finishReason: FinishReason;
   readonly stopReason:
-    "model-finish" | "stop-condition" | "max-steps" | "budget";
+    | "model-finish"
+    | "stop-condition"
+    | "max-steps"
+    | "budget";
   readonly cost?: Cost | undefined;
 }
 
@@ -140,7 +143,8 @@ export type GenerateTextOptions<Tools extends ToolSet = ToolSet> = Prompt & {
   readonly callbacks?: LifecycleCallbacks | undefined;
   readonly telemetry?: TelemetryOptions | undefined;
   readonly onStepFinish?:
-    ((step: StepResult) => void | Promise<void>) | undefined;
+    | ((step: StepResult) => void | Promise<void>)
+    | undefined;
 };
 
 export const createMessages = (
@@ -555,16 +559,17 @@ export const generateTextInternal = async <Tools extends ToolSet = ToolSet>(
   const telemetry = createTelemetryRuntime(options.telemetry);
   const runTelemetry = telemetry?.startRun("generate_text", runId);
   let cost: Cost | undefined;
-  const retry = options.callbacks?.onRetry || telemetry
-    ? {
-        ...options.retry,
-        async onRetry(event: RetryEvent): Promise<void> {
-          await options.retry?.onRetry?.(event);
-          await invokeLifecycle(options.callbacks?.onRetry, "onRetry", event);
-          telemetry?.recordRetry(event);
-        },
-      }
-    : options.retry;
+  const retry =
+    options.callbacks?.onRetry || telemetry
+      ? {
+          ...options.retry,
+          async onRetry(event: RetryEvent): Promise<void> {
+            await options.retry?.onRetry?.(event);
+            await invokeLifecycle(options.callbacks?.onRetry, "onRetry", event);
+            telemetry?.recordRetry(event);
+          },
+        }
+      : options.retry;
 
   try {
     if (options.callbacks?.onStart)

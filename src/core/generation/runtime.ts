@@ -114,11 +114,13 @@ const validateContent = (
     } else if (type === "image" || type === "audio" || type === "file") {
       const data = part["data"];
       const mediaType = part["mediaType"];
-      if (!(
-        typeof data === "string" ||
-        data instanceof Uint8Array ||
-        data instanceof URL
-      ))
+      if (
+        !(
+          typeof data === "string" ||
+          data instanceof Uint8Array ||
+          data instanceof URL
+        )
+      )
         throw error(`${path}[${partIndex}].data is invalid`);
       if (
         (type === "audio" || type === "file") &&

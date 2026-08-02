@@ -20,8 +20,7 @@ export {
   tool,
 };
 export * from "./core/index";
-
-export const VERSION = "0.2.0";
+export { VERSION } from "./version";
 
 export const sdk = Object.freeze({
   Agent,

@@ -128,7 +128,8 @@ const withDefaults = (
       ? undefined
       : { ...defaults.headers, ...request.headers },
   providerOptions:
-    defaults.providerOptions === undefined && request.providerOptions === undefined
+    defaults.providerOptions === undefined &&
+    request.providerOptions === undefined
       ? undefined
       : { ...defaults.providerOptions, ...request.providerOptions },
 });
@@ -202,7 +203,9 @@ const serializeLogValue = (
 
 const logError = (error: unknown): { readonly type: string } => ({
   type:
-    typeof error === "object" && error !== null && "code" in error &&
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
     typeof error.code === "string"
       ? error.code
       : error instanceof Error
@@ -377,7 +380,9 @@ export interface CacheMiddlewareOptions {
   readonly cache: LanguageModelCache;
   readonly ttlMs?: number | undefined;
   readonly key?:
-    | ((context: CacheKeyContext) => string | undefined | Promise<string | undefined>)
+    | ((
+        context: CacheKeyContext,
+      ) => string | undefined | Promise<string | undefined>)
     | undefined;
   readonly maxStreamParts?: number | undefined;
 }
@@ -388,10 +393,15 @@ const toCanonicalValue = (
 ): JsonValue | undefined => {
   if (value === null || typeof value === "string" || typeof value === "boolean")
     return value;
-  if (typeof value === "number") return Number.isFinite(value) ? value : undefined;
+  if (typeof value === "number")
+    return Number.isFinite(value) ? value : undefined;
   if (value instanceof URL) return { $url: value.href };
   if (value instanceof Uint8Array)
-    return { $bytes: Array.from(value).map((byte) => byte.toString(16).padStart(2, "0")).join("") };
+    return {
+      $bytes: Array.from(value)
+        .map((byte) => byte.toString(16).padStart(2, "0"))
+        .join(""),
+    };
   if (typeof value !== "object") return undefined;
   if (seen.has(value)) return undefined;
   seen.add(value);
@@ -411,14 +421,17 @@ const toCanonicalValue = (
     const descriptor = Object.getOwnPropertyDescriptor(value, key);
     if (!descriptor || !("value" in descriptor)) return undefined;
     const canonical = toCanonicalValue(descriptor.value, seen);
-    if (canonical === undefined && descriptor.value !== undefined) return undefined;
+    if (canonical === undefined && descriptor.value !== undefined)
+      return undefined;
     if (canonical !== undefined) result[key] = canonical;
   }
   seen.delete(value);
   return result;
 };
 
-const defaultCacheKey = async (context: CacheKeyContext): Promise<string | undefined> => {
+const defaultCacheKey = async (
+  context: CacheKeyContext,
+): Promise<string | undefined> => {
   const canonical = toCanonicalValue(
     {
       operation: context.operation,
@@ -491,7 +504,8 @@ export const cacheMiddleware = (
       });
       if (key === undefined) return next(request);
       const cached = await readCache(options.cache, key);
-      if (cached?.operation === "generate") return structuredClone(cached.response);
+      if (cached?.operation === "generate")
+        return structuredClone(cached.response);
       const response = await next(request);
       await writeCache(options.cache, key, {
         operation: "generate",
@@ -572,7 +586,11 @@ export interface RetryMiddlewareOptions {
   readonly backoffFactor?: number | undefined;
   readonly jitter?: number | undefined;
   readonly shouldRetry?:
-    | ((error: unknown, operation: "generate" | "stream", attempt: number) => boolean | Promise<boolean>)
+    | ((
+        error: unknown,
+        operation: "generate" | "stream",
+        attempt: number,
+      ) => boolean | Promise<boolean>)
     | undefined;
   readonly onRetry?:
     | ((event: {
@@ -585,12 +603,17 @@ export interface RetryMiddlewareOptions {
 }
 
 const isRetryable = (error: unknown): boolean => {
-  if (typeof error !== "object" || error === null) return error instanceof TypeError;
+  if (typeof error !== "object" || error === null)
+    return error instanceof TypeError;
   if ("retryable" in error && error.retryable === true) return true;
   if ("status" in error && typeof error.status === "number")
     return error.status === 408 || error.status === 429 || error.status >= 500;
   if ("statusCode" in error && typeof error.statusCode === "number")
-    return error.statusCode === 408 || error.statusCode === 429 || error.statusCode >= 500;
+    return (
+      error.statusCode === 408 ||
+      error.statusCode === 429 ||
+      error.statusCode >= 500
+    );
   return error instanceof TypeError;
 };
 
@@ -608,7 +631,8 @@ const retryOperation = async <Result>(
       const retry = options.shouldRetry
         ? await options.shouldRetry(error, operation, attempt + 1)
         : isRetryable(error);
-      if (!retry || attempt === maximum || request.abortSignal?.aborted) throw error;
+      if (!retry || attempt === maximum || request.abortSignal?.aborted)
+        throw error;
       const delayMs = Math.min(
         options.maxDelayMs ?? 10_000,
         Math.max(
@@ -622,11 +646,18 @@ const retryOperation = async <Result>(
           Math.round(
             (options.initialDelayMs ?? 100) *
               (options.backoffFactor ?? 2) ** attempt *
-              (1 - (options.jitter ?? 0.2) + Math.random() * (options.jitter ?? 0.2) * 2),
+              (1 -
+                (options.jitter ?? 0.2) +
+                Math.random() * (options.jitter ?? 0.2) * 2),
           ),
         ),
       );
-      await options.onRetry?.({ operation, attempt: attempt + 1, delayMs, error });
+      await options.onRetry?.({
+        operation,
+        attempt: attempt + 1,
+        delayMs,
+        error,
+      });
       await new Promise<void>((resolve, reject) => {
         const signal = request.abortSignal;
         const timer = setTimeout(() => {
@@ -635,7 +666,10 @@ const retryOperation = async <Result>(
         }, delayMs);
         const abort = (): void => {
           clearTimeout(timer);
-          reject(signal?.reason ?? new DOMException("Operation aborted", "AbortError"));
+          reject(
+            signal?.reason ??
+              new DOMException("Operation aborted", "AbortError"),
+          );
         };
         if (signal?.aborted) abort();
         else signal?.addEventListener("abort", abort, { once: true });
@@ -677,7 +711,9 @@ export const retryMiddleware = (
     });
   if (
     options.jitter !== undefined &&
-    (!Number.isFinite(options.jitter) || options.jitter < 0 || options.jitter > 1)
+    (!Number.isFinite(options.jitter) ||
+      options.jitter < 0 ||
+      options.jitter > 1)
   )
     throw new AgentSdkError({
       code: "INVALID_ARGUMENT",

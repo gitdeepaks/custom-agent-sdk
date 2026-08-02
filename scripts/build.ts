@@ -11,6 +11,7 @@ const build = await Bun.build({
   outdir: "./dist",
   target: "node",
   naming: "[dir]/[name].[ext]",
+  external: ["@opentelemetry/api"],
 });
 
 if (!build.success) {

@@ -39,7 +39,9 @@ class StructuredModel implements LanguageModel {
     return modelResponse(this.text);
   }
 
-  async stream(request: ModelRequest): Promise<ReadableStream<ModelStreamPart>> {
+  async stream(
+    request: ModelRequest,
+  ): Promise<ReadableStream<ModelStreamPart>> {
     this.request = request;
     const chunks = this.chunks;
     return new ReadableStream<ModelStreamPart>({
@@ -180,8 +182,13 @@ describe("Phase 4 structured generation", () => {
   });
 
   test("supports schema-validated final output from agents", async () => {
-    const agent = new Agent({ model: new StructuredModel('{"name":"Ada","age":36}') });
-    const result = await agent.runObject({ prompt: "profile", schema: profileSchema });
+    const agent = new Agent({
+      model: new StructuredModel('{"name":"Ada","age":36}'),
+    });
+    const result = await agent.runObject({
+      prompt: "profile",
+      schema: profileSchema,
+    });
     expect(result.object.name).toBe("Ada");
   });
 });
@@ -220,7 +227,9 @@ describe("Phase 4 structured streaming", () => {
   });
 
   test("supports structured final output from streaming agents", async () => {
-    const agent = new Agent({ model: new StructuredModel("[1,2]", ["[1,", "2]"]) });
+    const agent = new Agent({
+      model: new StructuredModel("[1,2]", ["[1,", "2]"]),
+    });
     const run = agent.streamObject({
       prompt: "numbers",
       mode: "array",
@@ -237,13 +246,15 @@ const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
 const requireRecord = (value: unknown): Readonly<Record<string, unknown>> => {
-  if (!isRecord(value))
-    throw new Error("Expected an object");
+  if (!isRecord(value)) throw new Error("Expected an object");
   return value;
 };
 
-const requestBody = (init: RequestInit | undefined): Readonly<Record<string, unknown>> => {
-  if (typeof init?.body !== "string") throw new Error("Expected a request body");
+const requestBody = (
+  init: RequestInit | undefined,
+): Readonly<Record<string, unknown>> => {
+  if (typeof init?.body !== "string")
+    throw new Error("Expected a request body");
   const value: unknown = JSON.parse(init.body);
   return requireRecord(value);
 };
@@ -251,17 +262,27 @@ const requestBody = (init: RequestInit | undefined): Readonly<Record<string, unk
 describe("Phase 4 provider structured output contract", () => {
   test("OpenAI sends native JSON schema and core rejects invalid output", async () => {
     let captured: Readonly<Record<string, unknown>> | undefined;
-    const fetch = async (_input: string | URL | Request, init?: RequestInit): Promise<Response> => {
+    const fetch = async (
+      _input: string | URL | Request,
+      init?: RequestInit,
+    ): Promise<Response> => {
       captured = requestBody(init);
       return Response.json({
         id: "response-1",
         status: "completed",
         model: "openai-test",
-        output: [{ type: "message", content: [{ type: "output_text", text: '{"name":"Ada"}' }] }],
+        output: [
+          {
+            type: "message",
+            content: [{ type: "output_text", text: '{"name":"Ada"}' }],
+          },
+        ],
         usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 },
       });
     };
-    const model = createOpenAI({ apiKey: "test", fetch }).languageModel("openai-test");
+    const model = createOpenAI({ apiKey: "test", fetch }).languageModel(
+      "openai-test",
+    );
 
     await expect(
       generateObject({ model, prompt: "profile", schema: profileSchema }),
@@ -277,7 +298,10 @@ describe("Phase 4 provider structured output contract", () => {
 
   test("Anthropic sends native JSON schema and returns validated output", async () => {
     let captured: Readonly<Record<string, unknown>> | undefined;
-    const fetch = async (_input: string | URL | Request, init?: RequestInit): Promise<Response> => {
+    const fetch = async (
+      _input: string | URL | Request,
+      init?: RequestInit,
+    ): Promise<Response> => {
       captured = requestBody(init);
       return Response.json({
         id: "message-1",
@@ -288,8 +312,14 @@ describe("Phase 4 provider structured output contract", () => {
         usage: { input_tokens: 1, output_tokens: 1 },
       });
     };
-    const model = createAnthropic({ apiKey: "test", fetch }).languageModel("anthropic-test");
-    const result = await generateObject({ model, prompt: "profile", schema: profileSchema });
+    const model = createAnthropic({ apiKey: "test", fetch }).languageModel(
+      "anthropic-test",
+    );
+    const result = await generateObject({
+      model,
+      prompt: "profile",
+      schema: profileSchema,
+    });
 
     expect(result.object.age).toBe(36);
     if (!captured) throw new Error("Expected an Anthropic request");

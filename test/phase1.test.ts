@@ -98,7 +98,9 @@ describe("Phase 1 option and response validation", () => {
     };
     await expect(
       generateText({ model: malformed, prompt: "x" }),
-    ).rejects.toMatchObject({ code: "MODEL_RESPONSE_INVALID" });
+    ).rejects.toMatchObject({
+      code: "MODEL_RESPONSE_INVALID",
+    });
   });
 
   test("preserves class model method binding", async () => {

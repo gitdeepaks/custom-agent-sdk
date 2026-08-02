@@ -2,7 +2,7 @@
 
 ## Objective
 
-Evolve `@open-agent/sdk` into a production-grade, provider-neutral TypeScript AI SDK with reliability and developer experience comparable to mature systems such as the Vercel AI SDK.
+Evolve `@deepaksankhyan91/open-agent-sdk` into a production-grade, provider-neutral TypeScript AI SDK with reliability and developer experience comparable to mature systems such as the Vercel AI SDK.
 
 The initial production milestone will focus on:
 

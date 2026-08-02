@@ -16,7 +16,10 @@ export interface ToolExecutionContext {
 }
 
 export type ToolApprovalOutcome =
-  "approved" | "denied" | "user-approval" | "not-applicable";
+  | "approved"
+  | "denied"
+  | "user-approval"
+  | "not-applicable";
 
 declare const toolInput: unique symbol;
 declare const toolOutput: unique symbol;

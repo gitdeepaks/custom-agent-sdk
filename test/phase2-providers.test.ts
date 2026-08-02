@@ -1,7 +1,10 @@
 import { expect } from "bun:test";
 import { createAnthropic } from "../src/providers/anthropic";
 import { createOpenAI } from "../src/providers/openai";
-import { providerContract, type ProviderContractFixture } from "./provider-contract";
+import {
+  providerContract,
+  type ProviderContractFixture,
+} from "./provider-contract";
 
 const jsonResponse = (
   body: unknown,
@@ -67,12 +70,14 @@ const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
 const requireRecord = (value: unknown): Readonly<Record<string, unknown>> => {
-  if (!isRecord(value))
-    throw new Error("Expected an object");
+  if (!isRecord(value)) throw new Error("Expected an object");
   return value;
 };
 
-const openAIResponse = (output: readonly unknown[], usage = { input_tokens: 8, output_tokens: 4, total_tokens: 12 }) => ({
+const openAIResponse = (
+  output: readonly unknown[],
+  usage = { input_tokens: 8, output_tokens: 4, total_tokens: 12 },
+) => ({
   id: "openai-response",
   object: "response",
   created_at: 1_700_000_000,
@@ -84,7 +89,10 @@ const openAIResponse = (output: readonly unknown[], usage = { input_tokens: 8, o
 
 const openAI: ProviderContractFixture = {
   provider: "openai",
-  createModel: (fetch) => createOpenAI({ apiKey: "test-key", fetch }).languageModel("openai-test-model"),
+  createModel: (fetch) =>
+    createOpenAI({ apiKey: "test-key", fetch }).languageModel(
+      "openai-test-model",
+    ),
   textResponse: (requestId) =>
     jsonResponse(
       openAIResponse([
@@ -112,7 +120,13 @@ const openAI: ProviderContractFixture = {
     ),
   streamResponse: (requestId) => {
     const completed = openAIResponse(
-      [{ type: "message", role: "assistant", content: [{ type: "output_text", text: "streamed text" }] }],
+      [
+        {
+          type: "message",
+          role: "assistant",
+          content: [{ type: "output_text", text: "streamed text" }],
+        },
+      ],
       { input_tokens: 5, output_tokens: 3, total_tokens: 8 },
     );
     return sseResponse(
@@ -192,17 +206,30 @@ const anthropicMessage = (
 
 const anthropic: ProviderContractFixture = {
   provider: "anthropic",
-  createModel: (fetch) => createAnthropic({ apiKey: "test-key", fetch }).languageModel("anthropic-test-model"),
+  createModel: (fetch) =>
+    createAnthropic({ apiKey: "test-key", fetch }).languageModel(
+      "anthropic-test-model",
+    ),
   textResponse: (requestId) =>
     jsonResponse(
-      anthropicMessage([{ type: "text", text: "Hello from provider" }], "end_turn"),
+      anthropicMessage(
+        [{ type: "text", text: "Hello from provider" }],
+        "end_turn",
+      ),
       requestId,
       "request-id",
     ),
   toolResponse: (requestId) =>
     jsonResponse(
       anthropicMessage(
-        [{ type: "tool_use", id: "call-lookup", name: "lookup", input: { city: "Paris" } }],
+        [
+          {
+            type: "tool_use",
+            id: "call-lookup",
+            name: "lookup",
+            input: { city: "Paris" },
+          },
+        ],
         "tool_use",
       ),
       requestId,

@@ -329,18 +329,19 @@ async function* runStream<Tools extends ToolSet>(
   const telemetry = createTelemetryRuntime(options.telemetry);
   const runTelemetry = telemetry?.startRun("stream_text", runId);
   let cost: Cost | undefined;
-  const retry = options.callbacks?.onRetry || telemetry
-    ? {
-        ...options.retry,
-        async onRetry(
-          event: import("./generate-text").RetryEvent,
-        ): Promise<void> {
-          await options.retry?.onRetry?.(event);
-          await invokeLifecycle(options.callbacks?.onRetry, "onRetry", event);
-          telemetry?.recordRetry(event);
-        },
-      }
-    : options.retry;
+  const retry =
+    options.callbacks?.onRetry || telemetry
+      ? {
+          ...options.retry,
+          async onRetry(
+            event: import("./generate-text").RetryEvent,
+          ): Promise<void> {
+            await options.retry?.onRetry?.(event);
+            await invokeLifecycle(options.callbacks?.onRetry, "onRetry", event);
+            telemetry?.recordRetry(event);
+          },
+        }
+      : options.retry;
 
   try {
     if (options.callbacks?.onStart)

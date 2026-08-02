@@ -44,7 +44,7 @@ export interface SerializedAgentSdkError {
   readonly retryAfterMs?: number | undefined;
 }
 
-const sdkErrorMarker = Symbol.for("@open-agent/sdk.error");
+const sdkErrorMarker = Symbol.for("@deepaksankhyan91/open-agent-sdk.error");
 
 export class AgentSdkError extends Error {
   readonly [sdkErrorMarker] = true;

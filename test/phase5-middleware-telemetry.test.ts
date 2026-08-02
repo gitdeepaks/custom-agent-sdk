@@ -54,7 +54,9 @@ const readableParts = (
   });
 };
 
-const collect = async <Value>(stream: ReadableStream<Value>): Promise<Value[]> => {
+const collect = async <Value>(
+  stream: ReadableStream<Value>,
+): Promise<Value[]> => {
   const values: Value[] = [];
   for await (const value of stream) values.push(value);
   return values;
@@ -156,7 +158,10 @@ describe("Phase 5 middleware", () => {
       providerOptions: { region: "request", tier: "standard" },
     });
     expect(original.maxOutputTokens).toBeUndefined();
-    expect(original.headers).toEqual({ authorization: "request", tenant: "one" });
+    expect(original.headers).toEqual({
+      authorization: "request",
+      tenant: "one",
+    });
   });
 
   test("logging excludes content by default and finishes streams on consumption", async () => {
@@ -259,8 +264,12 @@ describe("Phase 5 middleware", () => {
       middleware: [cacheMiddleware({ cache: new MemoryLanguageModelCache() })],
     });
 
-    expect((await wrapped.generate(request({ tenant: "one" }))).text).toBe("call-1");
-    expect((await wrapped.generate(request({ tenant: "two" }))).text).toBe("call-2");
+    expect((await wrapped.generate(request({ tenant: "one" }))).text).toBe(
+      "call-1",
+    );
+    expect((await wrapped.generate(request({ tenant: "two" }))).text).toBe(
+      "call-2",
+    );
     if (!wrapped.stream) throw new Error("Expected wrapped native stream");
     const reader = (await wrapped.stream(request())).getReader();
     await reader.read();
@@ -374,7 +383,13 @@ describe("Phase 5 telemetry", () => {
         return call === 1
           ? {
               text: "",
-              toolCalls: [{ toolCallId: "call-1", toolName: "lookup", input: { secret: "input" } }],
+              toolCalls: [
+                {
+                  toolCallId: "call-1",
+                  toolName: "lookup",
+                  input: { secret: "input" },
+                },
+              ],
               finishReason: "tool-calls",
               usage,
             }
@@ -411,10 +426,18 @@ describe("Phase 5 telemetry", () => {
     });
 
     expect(result.text).toBe("private model output");
-    expect(redacted.some((value) => value.includes("private model input"))).toBe(true);
-    expect(redacted.some((value) => value.includes("private model output"))).toBe(true);
-    expect(redacted.some((value) => value.includes('"secret":"input"'))).toBe(true);
-    expect(redacted.some((value) => value.includes('"secret":"output"'))).toBe(true);
+    expect(
+      redacted.some((value) => value.includes("private model input")),
+    ).toBe(true);
+    expect(
+      redacted.some((value) => value.includes("private model output")),
+    ).toBe(true);
+    expect(redacted.some((value) => value.includes('"secret":"input"'))).toBe(
+      true,
+    );
+    expect(redacted.some((value) => value.includes('"secret":"output"'))).toBe(
+      true,
+    );
   });
 
   test("instruments native streaming without changing emitted data", async () => {

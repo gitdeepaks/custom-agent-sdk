@@ -90,9 +90,7 @@ const openAI = createOpenAI({
 const anthropic = createAnthropic({
   apiKey: requireEnvironment("ANTHROPIC_API_KEY"),
   baseURL: Bun.env["ANTHROPIC_BASE_URL"],
-}).languageModel(
-  Bun.env["ANTHROPIC_MODEL"] ?? "claude-haiku-4-5-20251001",
-);
+}).languageModel(Bun.env["ANTHROPIC_MODEL"] ?? "claude-haiku-4-5-20251001");
 
 await testProvider("openai", openAI);
 await testProvider("anthropic", anthropic);

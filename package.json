@@ -1,7 +1,24 @@
 {
-  "name": "@open-agent/sdk",
-  "version": "0.2.0",
+  "name": "@deepaksankhyan91/open-agent-sdk",
+  "version": "0.2.1-next.0",
   "description": "Provider-neutral, type-safe agent SDK for TypeScript",
+  "keywords": [
+    "ai",
+    "agent",
+    "anthropic",
+    "openai",
+    "sdk",
+    "typescript"
+  ],
+  "homepage": "https://github.com/gitdeepaks/custom-agent-sdk#readme",
+  "bugs": {
+    "url": "https://github.com/gitdeepaks/custom-agent-sdk/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gitdeepaks/custom-agent-sdk.git"
+  },
+  "author": "Deepak Sankhyan",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -22,20 +39,41 @@
   "sideEffects": false,
   "files": [
     "dist",
-    "src"
+    "CHANGELOG.md",
+    "LICENSE",
+    "MIGRATION.md",
+    "README.md",
+    "SECURITY.md"
   ],
   "scripts": {
+    "clean": "rm -rf dist coverage",
     "build": "bun ./scripts/build.ts",
+    "format": "biome format --write .",
+    "format:check": "biome format .",
+    "lint": "biome lint .",
     "test": "bun test",
+    "test:coverage": "bun test --coverage --coverage-reporter=text --coverage-reporter=lcov && bun ./scripts/coverage-gate.ts",
+    "test:performance": "bun ./scripts/performance-gate.ts",
     "test:live": "bun ./scripts/live-provider-smoke.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "verify:artifacts": "bun ./scripts/verify-package.ts",
+    "verify:package": "bun ./scripts/package-smoke.ts",
+    "check": "bun run format:check && bun run lint && bun run typecheck && bun run test",
+    "check:release": "bun run check && bun run test:coverage && bun run test:performance && bun run build && bun run verify:artifacts && bun run verify:package",
+    "prepack": "bun run check && bun run build && bun run verify:artifacts"
   },
   "devDependencies": {
-    "@types/bun": "latest",
-    "typescript": "^7.0.0-dev.20260728"
+    "@biomejs/biome": "2.5.6",
+    "@types/bun": "1.3.14",
+    "typescript": "7.0.2"
   },
   "engines": {
     "bun": ">=1.2.0"
+  },
+  "packageManager": "bun@1.3.14",
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
   },
   "license": "MIT",
   "dependencies": {

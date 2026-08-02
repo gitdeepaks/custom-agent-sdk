@@ -1,8 +1,5 @@
 import { AgentSdkError, OutputValidationError } from "../errors/errors";
-import type {
-  JsonValue,
-  ModelOutputFormat,
-} from "../model/types";
+import type { JsonValue, ModelOutputFormat } from "../model/types";
 import type { Schema, ToolSet } from "../tools/tool";
 import {
   generateTextInternal,
@@ -83,20 +80,24 @@ const isJsonValue = (value: unknown): value is JsonValue => {
   return isRecord(value) && Object.values(value).every(isJsonValue);
 };
 
-const validationError = (message: string, cause?: unknown): OutputValidationError =>
-  new OutputValidationError({ message, cause });
+const validationError = (
+  message: string,
+  cause?: unknown,
+): OutputValidationError => new OutputValidationError({ message, cause });
 
 const validateConfiguration = (options: RuntimeOutputOptions): void => {
   if (options.name !== undefined) {
     if (!/^[A-Za-z0-9_-]{1,64}$/.test(options.name))
       throw new AgentSdkError({
         code: "INVALID_ARGUMENT",
-        message: "Structured output name must contain 1-64 letters, numbers, underscores, or hyphens",
+        message:
+          "Structured output name must contain 1-64 letters, numbers, underscores, or hyphens",
       });
   }
   if (
     options.description !== undefined &&
-    (typeof options.description !== "string" || options.description.length === 0)
+    (typeof options.description !== "string" ||
+      options.description.length === 0)
   )
     throw new AgentSdkError({
       code: "INVALID_ARGUMENT",
@@ -110,7 +111,8 @@ const validateConfiguration = (options: RuntimeOutputOptions): void => {
     )
       throw new AgentSdkError({
         code: "INVALID_ARGUMENT",
-        message: "Structured enum values must be a non-empty list of unique strings",
+        message:
+          "Structured enum values must be a non-empty list of unique strings",
       });
   } else if (options.mode !== "json") {
     if (
@@ -159,7 +161,9 @@ const parseOutput = (text: string, options: RuntimeOutputOptions): unknown => {
   if (options.mode === "json") return value;
   if (options.mode === "enum") {
     if (typeof value !== "string" || !options.values.includes(value))
-      throw validationError("The model returned a value outside the configured enum");
+      throw validationError(
+        "The model returned a value outside the configured enum",
+      );
     return value;
   }
   if (options.mode === "array") {
@@ -168,7 +172,10 @@ const parseOutput = (text: string, options: RuntimeOutputOptions): unknown => {
     try {
       return value.map((element) => options.schema.parse(element));
     } catch (cause) {
-      throw validationError("The model returned an array with invalid elements", cause);
+      throw validationError(
+        "The model returned an array with invalid elements",
+        cause,
+      );
     }
   }
   if (!isRecord(value))
@@ -176,7 +183,10 @@ const parseOutput = (text: string, options: RuntimeOutputOptions): unknown => {
   try {
     return options.schema.parse(value);
   } catch (cause) {
-    throw validationError("The model returned an object that failed schema validation", cause);
+    throw validationError(
+      "The model returned an object that failed schema validation",
+      cause,
+    );
   }
 };
 
@@ -197,20 +207,22 @@ const parseWithRepair = async (
     try {
       repaired = await options.repair({ text, error: original });
     } catch (repairCause) {
-      throw validationError("The structured output repair callback failed", repairCause).withPartialResult(
-        generation,
-      );
+      throw validationError(
+        "The structured output repair callback failed",
+        repairCause,
+      ).withPartialResult(generation);
     }
     if (typeof repaired !== "string")
-      throw validationError("The structured output repair callback must return a string").withPartialResult(
-        generation,
-      );
+      throw validationError(
+        "The structured output repair callback must return a string",
+      ).withPartialResult(generation);
     try {
       return parseOutput(repaired, options);
     } catch (repairError) {
-      throw validationError("The repaired model output failed validation", repairError).withPartialResult(
-        generation,
-      );
+      throw validationError(
+        "The repaired model output failed validation",
+        repairError,
+      ).withPartialResult(generation);
     }
   }
 };
@@ -261,16 +273,22 @@ const runStructuredGeneration = async (
 };
 
 export function generateObject<Output, Tools extends ToolSet = ToolSet>(
-  options: GenerateTextOptions<Tools> & ObjectOutputOptions<Output> & RepairOption,
+  options: GenerateTextOptions<Tools> &
+    ObjectOutputOptions<Output> &
+    RepairOption,
 ): Promise<GenerateObjectResult<Output>>;
 export function generateObject<Element, Tools extends ToolSet = ToolSet>(
-  options: GenerateTextOptions<Tools> & ArrayOutputOptions<Element> & RepairOption,
+  options: GenerateTextOptions<Tools> &
+    ArrayOutputOptions<Element> &
+    RepairOption,
 ): Promise<GenerateObjectResult<readonly Element[]>>;
 export function generateObject<
   const Values extends readonly string[],
   Tools extends ToolSet = ToolSet,
 >(
-  options: GenerateTextOptions<Tools> & EnumOutputOptions<Values> & RepairOption,
+  options: GenerateTextOptions<Tools> &
+    EnumOutputOptions<Values> &
+    RepairOption,
 ): Promise<GenerateObjectResult<Values[number]>>;
 export function generateObject<Tools extends ToolSet = ToolSet>(
   options: GenerateTextOptions<Tools> & JsonOutputOptions & RepairOption,
@@ -340,16 +358,22 @@ const createPartialStream = (
 };
 
 export function streamObject<Output, Tools extends ToolSet = ToolSet>(
-  options: GenerateTextOptions<Tools> & ObjectOutputOptions<Output> & RepairOption,
+  options: GenerateTextOptions<Tools> &
+    ObjectOutputOptions<Output> &
+    RepairOption,
 ): StreamObjectResult<Output>;
 export function streamObject<Element, Tools extends ToolSet = ToolSet>(
-  options: GenerateTextOptions<Tools> & ArrayOutputOptions<Element> & RepairOption,
+  options: GenerateTextOptions<Tools> &
+    ArrayOutputOptions<Element> &
+    RepairOption,
 ): StreamObjectResult<readonly Element[]>;
 export function streamObject<
   const Values extends readonly string[],
   Tools extends ToolSet = ToolSet,
 >(
-  options: GenerateTextOptions<Tools> & EnumOutputOptions<Values> & RepairOption,
+  options: GenerateTextOptions<Tools> &
+    EnumOutputOptions<Values> &
+    RepairOption,
 ): StreamObjectResult<Values[number]>;
 export function streamObject<Tools extends ToolSet = ToolSet>(
   options: GenerateTextOptions<Tools> & JsonOutputOptions & RepairOption,

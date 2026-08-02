@@ -1,16 +1,12 @@
 {
   "compilerOptions": {
     // Environment setup & latest features
-    "lib": [
-      "ESNext"
-    ],
+    "lib": ["ESNext"],
     "target": "ESNext",
     "module": "Preserve",
     "moduleDetection": "force",
     "allowJs": false,
-    "types": [
-      "bun"
-    ],
+    "types": ["bun"],
     // Bundler mode
     "moduleResolution": "bundler",
     "verbatimModuleSyntax": true,

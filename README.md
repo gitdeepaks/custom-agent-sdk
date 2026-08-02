@@ -14,7 +14,13 @@ This repository includes a provider-neutral core plus first-party OpenAI Respons
 ## Install
 
 ```bash
-bun install
+bun add @deepaksankhyan91/open-agent-sdk
+```
+
+The package can also be installed with npm:
+
+```bash
+npm install @deepaksankhyan91/open-agent-sdk
 ```
 
 ## Environment Variables
@@ -42,15 +48,15 @@ ANTHROPIC_API_KEY=sk-ant-...
 | `OPENAI_BASE_URL`    | No                 | Overrides the OpenAI endpoint when supported by the adapter.    |
 | `ANTHROPIC_BASE_URL` | No                 | Overrides the Anthropic endpoint when supported by the adapter. |
 
-The core `@open-agent/sdk` package does not read these variables. Credentials belong to the application or provider package that constructs the `LanguageModel`. Do not use `OPENAI_API_KEY || ANTHROPIC_API_KEY`; select a provider explicitly and validate its corresponding key. Never commit `.env` or real credentials. The repository ignores `.env` while retaining `.env.example` as documentation.
+The core `@deepaksankhyan91/open-agent-sdk` package does not read these variables. Credentials belong to the application or provider package that constructs the `LanguageModel`. Do not use `OPENAI_API_KEY || ANTHROPIC_API_KEY`; select a provider explicitly and validate its corresponding key. Never commit `.env` or real credentials. The repository ignores `.env` while retaining `.env.example` as documentation.
 
 ## Quick Start
 
 Create a provider explicitly and pass its protocol-v1 model to the core:
 
 ```ts
-import { Agent, defineSchema, tool } from "@open-agent/sdk";
-import { createOpenAI } from "@open-agent/sdk/openai";
+import { Agent, defineSchema, tool } from "@deepaksankhyan91/open-agent-sdk";
+import { createOpenAI } from "@deepaksankhyan91/open-agent-sdk/openai";
 
 const apiKey = Bun.env.OPENAI_API_KEY;
 if (!apiKey) throw new Error("OPENAI_API_KEY is required");
@@ -289,7 +295,11 @@ When omitted or configured with `enabled: false`, telemetry does not obtain a tr
 bun test
 bun run typecheck
 bun run build
+bun run verify:package
 ```
+
+Contributor setup and release requirements are documented in
+[`CONTRIBUTING.md`](./CONTRIBUTING.md).
 
 ## Provider Contract
 
@@ -298,7 +308,7 @@ bun run build
 Provider adapters implement `Provider` and create models through `languageModel(modelId, settings?)`. Each provider owns its API key, endpoint, request validation, and typed model settings. The core intentionally never reads `OPENAI_API_KEY` or `ANTHROPIC_API_KEY`.
 
 ```ts
-import { createAnthropic } from "@open-agent/sdk/anthropic";
+import { createAnthropic } from "@deepaksankhyan91/open-agent-sdk/anthropic";
 
 const apiKey = Bun.env.ANTHROPIC_API_KEY;
 if (!apiKey) throw new Error("ANTHROPIC_API_KEY is required");

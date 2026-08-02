@@ -99,7 +99,10 @@ const recordUsage = (
 ): void => {
   const record = (type: string, value: number | undefined): void => {
     if (value !== undefined)
-      metricsSet.tokenUsage.record(value, { ...attributes, "gen_ai.token.type": type });
+      metricsSet.tokenUsage.record(value, {
+        ...attributes,
+        "gen_ai.token.type": type,
+      });
   };
   record("input", usage.inputTokens);
   record("output", usage.outputTokens);
@@ -117,23 +120,33 @@ export class TelemetryRuntime {
 
   constructor(options: TelemetryOptions) {
     this.options = options;
-    this.tracer = options.tracer ?? trace.getTracer("@open-agent/sdk");
-    const meter = options.meter ?? metrics.getMeter("@open-agent/sdk");
+    this.tracer =
+      options.tracer ?? trace.getTracer("@deepaksankhyan91/open-agent-sdk");
+    const meter =
+      options.meter ?? metrics.getMeter("@deepaksankhyan91/open-agent-sdk");
     this.commonAttributes = options.attributes ?? {};
     this.metrics = {
-      runDuration: meter.createHistogram("open_agent.run.duration", { unit: "s" }),
+      runDuration: meter.createHistogram("open_agent.run.duration", {
+        unit: "s",
+      }),
       modelDuration: meter.createHistogram("gen_ai.client.operation.duration", {
         unit: "s",
       }),
       firstChunkDuration: meter.createHistogram(
         "open_agent.model.first_chunk.duration",
-        { unit: "s" },
+        {
+          unit: "s",
+        },
       ),
       chunkInterval: meter.createHistogram("open_agent.model.chunk.interval", {
         unit: "s",
       }),
-      toolDuration: meter.createHistogram("open_agent.tool.duration", { unit: "s" }),
-      retryDelay: meter.createHistogram("open_agent.retry.delay", { unit: "s" }),
+      toolDuration: meter.createHistogram("open_agent.tool.duration", {
+        unit: "s",
+      }),
+      retryDelay: meter.createHistogram("open_agent.retry.delay", {
+        unit: "s",
+      }),
       tokenUsage: meter.createHistogram("gen_ai.client.token.usage", {
         unit: "{token}",
       }),
@@ -161,7 +174,9 @@ export class TelemetryRuntime {
     this.runSpan = span;
     this.runContext = trace.setSpan(otelContext.active(), span);
     return this.scope(span, started, (duration) =>
-      this.metrics.runDuration.record(duration, { "gen_ai.operation.name": operation }),
+      this.metrics.runDuration.record(duration, {
+        "gen_ai.operation.name": operation,
+      }),
     );
   }
 
@@ -174,7 +189,11 @@ export class TelemetryRuntime {
     };
   }
 
-  startTool(toolName: string, toolCallId: string, input: unknown): TelemetryToolScope {
+  startTool(
+    toolName: string,
+    toolCallId: string,
+    input: unknown,
+  ): TelemetryToolScope {
     const started = performance.now();
     const attributes: Attributes = {
       ...this.commonAttributes,
@@ -195,7 +214,9 @@ export class TelemetryRuntime {
       return { ...noopScope(), span: undefined };
     }
     const scope = this.scope(span, started, (duration) =>
-      this.metrics.toolDuration.record(duration, { "gen_ai.tool.name": toolName }),
+      this.metrics.toolDuration.record(duration, {
+        "gen_ai.tool.name": toolName,
+      }),
     );
     return { span, ...scope };
   }
@@ -253,7 +274,12 @@ export class TelemetryRuntime {
       return next(request);
     }
     if (this.options.recordInputs)
-      safe(() => span.setAttribute("gen_ai.input.messages", this.serialize(request.messages)));
+      safe(() =>
+        span.setAttribute(
+          "gen_ai.input.messages",
+          this.serialize(request.messages),
+        ),
+      );
     try {
       const response = await next(request);
       const responseId = response.responseId;
@@ -263,8 +289,16 @@ export class TelemetryRuntime {
       if (responseModelId)
         safe(() => span.setAttribute("gen_ai.response.model", responseModelId));
       if (this.options.recordOutputs)
-        safe(() => span.setAttribute("gen_ai.output.text", this.redact(response.text)));
-      this.finishModel(span, started, context, response.usage, response.finishReason);
+        safe(() =>
+          span.setAttribute("gen_ai.output.text", this.redact(response.text)),
+        );
+      this.finishModel(
+        span,
+        started,
+        context,
+        response.usage,
+        response.finishReason,
+      );
       return response;
     } catch (error) {
       this.endSpanError(span, error);
@@ -291,7 +325,12 @@ export class TelemetryRuntime {
       return next(request);
     }
     if (this.options.recordInputs)
-      safe(() => span.setAttribute("gen_ai.input.messages", this.serialize(request.messages)));
+      safe(() =>
+        span.setAttribute(
+          "gen_ai.input.messages",
+          this.serialize(request.messages),
+        ),
+      );
     try {
       const source = await next(request);
       const reader = source.getReader();
@@ -304,7 +343,11 @@ export class TelemetryRuntime {
           try {
             const read = await reader.read();
             if (read.done) {
-              if (!ended) this.endSpanError(span, new Error("Stream ended without finish"));
+              if (!ended)
+                this.endSpanError(
+                  span,
+                  new Error("Stream ended without finish"),
+                );
               controller.close();
               reader.releaseLock();
               return;
@@ -313,11 +356,17 @@ export class TelemetryRuntime {
             if (first) {
               first = false;
               safe(() =>
-                this.metrics.firstChunkDuration.record((now - started) / 1_000, attributes),
+                this.metrics.firstChunkDuration.record(
+                  (now - started) / 1_000,
+                  attributes,
+                ),
               );
             } else {
               safe(() =>
-                this.metrics.chunkInterval.record((now - previousChunk) / 1_000, attributes),
+                this.metrics.chunkInterval.record(
+                  (now - previousChunk) / 1_000,
+                  attributes,
+                ),
               );
             }
             previousChunk = now;
@@ -325,7 +374,9 @@ export class TelemetryRuntime {
             if (read.value.type === "finish") {
               ended = true;
               if (this.options.recordOutputs)
-                safe(() => span.setAttribute("gen_ai.output.text", this.redact(output)));
+                safe(() =>
+                  span.setAttribute("gen_ai.output.text", this.redact(output)),
+                );
               this.finishModel(
                 span,
                 started,
@@ -374,7 +425,11 @@ export class TelemetryRuntime {
     usage: Usage,
     finishReason: string,
   ): void {
-    const attributes = metricAttributes("chat", context.provider, context.modelId);
+    const attributes = metricAttributes(
+      "chat",
+      context.provider,
+      context.modelId,
+    );
     safe(() => {
       span.setAttributes({
         "gen_ai.response.finish_reasons": [finishReason],
@@ -386,7 +441,10 @@ export class TelemetryRuntime {
       });
       span.setStatus({ code: SpanStatusCode.OK });
       span.end();
-      this.metrics.modelDuration.record((performance.now() - started) / 1_000, attributes);
+      this.metrics.modelDuration.record(
+        (performance.now() - started) / 1_000,
+        attributes,
+      );
       recordUsage(this.metrics, usage, attributes);
     });
   }
@@ -472,5 +530,10 @@ export const telemetryMiddleware = (
 export const modelCost = (
   model: LanguageModel,
   usage: Usage,
-  calculate: ((options: { readonly model: LanguageModel; readonly usage: Usage }) => Cost) | undefined,
+  calculate:
+    | ((options: {
+        readonly model: LanguageModel;
+        readonly usage: Usage;
+      }) => Cost)
+    | undefined,
 ): Cost | undefined => calculate?.({ model, usage });
