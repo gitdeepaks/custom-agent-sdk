@@ -1,6 +1,6 @@
 {
   "name": "@deepaksankhyan91/open-agent-sdk",
-  "version": "0.2.1-next.0",
+  "version": "0.3.0-next.0",
   "description": "Provider-neutral, type-safe agent SDK for TypeScript",
   "keywords": [
     "ai",
